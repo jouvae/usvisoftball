@@ -1,6 +1,6 @@
 # Status: softball/init
 
-**Active tier:** T3   **Phase:** Actualize (Phase 3) — **IN PROGRESS**   **Updated:** 2026-07-31
+**Active tier:** T3   **Phase:** Actualize (Phase 3) — **MERGED to `main`; pre-deploy pending**   **Updated:** 2026-07-31
 
 > ▶ **SESSION HANDOFF (2026-07-31)** — *this block + the Resume recipe are the single entry point
 > for a fresh session with no memory of the prior conversation.*
@@ -47,10 +47,23 @@
 > `red-team-passed`. CI: repo `.github/workflows/ci.yml` is partial — **gates enforced locally here**
 > (the approved model); CI wiring is a follow-up.
 >
-> **▶ NEXT: pre-merge checkpoint (HUMAN) — present gate results → get the go to commit + merge.** The
-> tree is still **entirely uncommitted**; the merge is where it first gets committed. Then the **pre-deploy
-> checkpoint** before the Fly rollout. `init-e2e-007` ships **deferred-behind-flag** (AI panel off in prod;
-> lights up on the Federation's source list B1 + a real-model go B2). See slice-09 block + §Open loops.
+> **✅ MERGED to `main` (2026-07-31): `cb165f9`, pushed to `origin`.** All gates passed; pre-merge
+> checkpoint cleared (human: commit + merge). All 9 scenarios **shipped to `main`** (`init-e2e-007` behind
+> the `NEXT_PUBLIC_AI_DRAFT_ENABLED` flag, off in prod).
+>
+> **▶ NEXT: pre-deploy checkpoint (HUMAN) — the Fly production rollout.** Deploy artifacts are ready
+> (`Dockerfile`, `fly.toml`, `output:'standalone'`, self-hosted fonts → offline `next build`). Rollout
+> needs human infra setup, NOT code: (1) create the Fly app (`fly launch`/`fly apps create`; set the app
+> name in `fly.toml`); (2) set the Supabase values as **Fly secrets** (`fly secrets set NEXT_PUBLIC_SUPABASE_URL=…
+> NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=… SUPABASE_KEY=…`; leave `NEXT_PUBLIC_AI_DRAFT_ENABLED` unset →
+> AI panel stays off); (3) decide the **prod Supabase target** (the current project is the dev one — a
+> separate prod project is advisable) and **apply migrations `0001`–`0005`** there; (4) `fly deploy`;
+> (5) confirm the auth cookie is `Secure` over HTTPS (red-team LOW). Then mark scenarios `deployed`.
+>
+> **`/actualize` deferred debt (follow-ups, tracked):** real media upload (MediaAsset); the AI drafter's
+> real-Claude swap-in + the Federation's owned/licensed source list (B1/B2); retire the legacy
+> service-role JWT (D2); editor UPDATE `source`/`author_id` column-pin trigger (D1); CI wiring;
+> rich-text renderer; editorial audit trail; role hierarchy. See slice-09 block + §Open loops.
 >
 > | Slice | Scenario | State |
 > |---|---|---|
