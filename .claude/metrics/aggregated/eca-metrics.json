@@ -1,0 +1,13 @@
+{
+  "updated": "2026-06-26",
+  "total_features": 0,
+  "tier_count": {"T1": 0, "T2": 0, "T3": 0, "unknown": 0},
+  "avg_cycle_days": null,
+  "lessons_applied_rate_pct": 0,
+  "auto_escalation_hit_pct": 0,
+  "prototype_kill_rate_pct": 0,
+  "shipped": 0,
+  "gates": {"dcon_pass": 0, "dcon_seen": 0, "red_team_code_pass": 0, "red_team_code_seen": 0, "red_team_interactive_pass": 0, "red_team_interactive_seen": 0},
+  "tier_calibration": "TODO(metric): incident/rollback rate by tier — needs incident feed",
+  "features": []
+}

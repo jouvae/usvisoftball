@@ -1,0 +1,35 @@
+# Fly.io deploy config for the USVI Softball Federation app.
+# Replace the `app` placeholder with the real Fly app name (`fly apps create ...`).
+# Secrets are provisioned OUT OF BAND with `fly secrets set` (see the Dockerfile /
+# README) and are NEVER committed here.
+
+app = "usvi-softball-PLACEHOLDER"
+primary_region = "mia"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # App listens on 8080 (matches the Dockerfile PORT). NOT a secret.
+  PORT = "8080"
+  # AI draft panel stays OFF in prod (hidden). Flip to "true" only deliberately.
+  NEXT_PUBLIC_AI_DRAFT_ENABLED = "false"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.checks]
+    [[http_service.checks.http_checks]]
+      path = "/"
+      method = "get"
+      interval = "15s"
+      timeout = "2s"
+      grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
