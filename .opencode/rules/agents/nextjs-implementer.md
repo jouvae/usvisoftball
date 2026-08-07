@@ -51,3 +51,29 @@ Loaded by `.opencode/agents/nextjs-implementer.md`. Schema + lifecycle:
 - last_validated: 2026-06-27
 - recurrences_after: 0
 - gate: none
+
+### R-nextjs-implementer-mock-mirrors-real-contract
+- trigger: a mock BFF route (or client) stands in for a real backend RPC that will be wired later (a prototype→deliver mock→real cutover), OR replacing such a mock with the real forward
+- rule: a mock must NOT be more permissive than the real RPC's contract — if the real RPC issues/owns an identifier (e.g. `ImportListings` issues the `batch_id`; a create RPC returns the ULID), the client must send the empty/absent value on first call and ADOPT the server-returned id for subsequent calls, and the mock must reject a client-invented id the same way the real RPC does. A mock that accepts arbitrary client-supplied ids (module-Map keyed on whatever the client sends) hides a client bug that only surfaces at the real cutover (the real RPC 404s the invented id). On mock→real cutover, re-read the real proto/handler for who owns each identifier and lifecycle field, and never assume the mock's shape was contract-faithful.
+- status: provisional
+- confidence: medium
+- classification: IMPLEMENTATION_GAP
+- source: L-data-v1-deliver-security-authz (07-19-2026); data/v1 Increment-D upload cutover (`use-uploader.ts` invented batch_id → real ImportListings 404)
+- tier: any
+- promoted: 2026-07-19
+- last_validated: 2026-07-19
+- recurrences_after: 0
+- gate: none
+
+### R-nextjs-implementer-parallelize-bff-forwards
+- trigger: a single BFF route handler (`clients/web/src/app/api/**/route.ts`) makes two or more INDEPENDENT backend forwards (e.g. `GetListings` + `GetRules` to reconstruct a view), neither depending on the other's result
+- rule: run independent forwards CONCURRENTLY with `Promise.all` (or `allSettled` when one is best-effort), not serial `await`s — the read's wall-clock is `max(calls)`, not their sum. A serial pair silently ~doubles latency and can breach a p95 budget (data/v1: serial GetListings→GetRules put the index route at 500–559 ms vs the parallel review route's 448 ms for identical work). When one call is a resilient enrichment (its failure must not fail the read), give it its own `.catch(() => fallback)` inside the `Promise.all` rather than wrapping the whole thing in one try/catch.
+- status: provisional
+- confidence: medium
+- classification: IMPLEMENTATION_GAP
+- source: L-data-v1-deliver-security-authz (07-19-2026); data/v1 load gate (get-BFF serialization defect)
+- tier: any
+- promoted: 2026-07-19
+- last_validated: 2026-07-19
+- recurrences_after: 0
+- gate: none

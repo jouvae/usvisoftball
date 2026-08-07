@@ -45,3 +45,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 3D-flow local SQLite store (offline Supabase fallback) — never committed
+clients/3dflow/db/*.db
+clients/3dflow/db/*.db-wal
+clients/3dflow/db/*.db-shm

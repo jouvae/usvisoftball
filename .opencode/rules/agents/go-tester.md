@@ -50,3 +50,41 @@ Loaded by `.opencode/agents/go-tester.md`. Schema + lifecycle:
 - last_validated: 2026-05-29
 - recurrences_after: 0
 - gate: none
+
+### R-go-tester-serialize-testcontainer-runs
+- trigger: verifying a testcontainer-backed service test package (e.g. reservations) with `go test`
+- rule: run the AUTHORITATIVE full-package pass ALONE — never two full-package `go test` invocations at once (a backgrounded run plus a foreground run). Concurrent runs contend over shared infra (DB/ports/backend) and produce a mass of spurious FAILs across unrelated suites (Instance/Booking/Authz ~6s timeouts). If a run shows many unrelated failures + 6s timeouts, suspect concurrency, re-run serially, and confirm green BEFORE reporting RED.
+- status: provisional
+- confidence: high
+- source: L-data-v1-deliver-improve (07-17-2026); data/v1 D5 route-rework verification
+- tier: T3
+- promoted: 2026-07-17
+- last_validated: 2026-07-17
+- recurrences_after: 0
+- gate: none
+- note: FOLLOWED and held in L-data-v1-deliver-security-authz (07-19) — packages run one at a time; no recurrence.
+
+### R-go-tester-helper-placement
+- trigger: adding or moving a test helper — deciding whether it belongs in shared `libs/go/tests` or a service's `tests/` dir
+- rule: a helper used by exactly ONE service's tests belongs in that service's `services/alpha/modules/{service}/tests/helpers_test.go` (package `service_tests`), NOT `libs/go/tests`. Only genuinely multi-service helpers (used by ≥2 service test packages) stay in `libs/go/tests`. Test rule: before adding to `libs/go/tests`, grep the helper's prospective callers across `services/alpha/modules/*/tests/` — one service → local; ≥2 → shared. A method on `tests.Helper` that depends on an unexported registered-client var but is single-service should be de-methodized to a plain func using the service fixture's own client (`fixture.contentClient`/`fixture.indClient`). Service-specific record/data builders (`Make*ImportRecord`, menu/passport fixtures) are the common offenders — keep them next to the tests that use them.
+- status: provisional
+- confidence: high
+- classification: CONVENTION_VIOLATION
+- source: L-data-v1-deliver-security-authz (07-19-2026); libs/go/tests de-bloat (user directive); restates CLAUDE.md test-helper placement discipline
+- tier: any
+- promoted: 2026-07-19
+- last_validated: 2026-07-19
+- recurrences_after: 0
+- gate: none
+
+### R-go-tester-route-not-a-resource
+- trigger: a data/v1 (reservations) test asserts a ROUTE id appears in `associated_resource_ids` or a `listing_resources` row
+- rule: under data/v1 D5 a route is NOT a resource — it binds via `listing_routes` (projection) + `route_rules` (authoritative join), never `listing_resources`. Assert route↔listing/rule binding through `route_rules`/`listing_routes` via `dconDB`; a resource-binding scenario (N resources → one listing) must use real physical resources (e.g. `tests.Helper{}.CreateVesselResource`). Relocate such an assertion to the new join — do not loosen or delete it.
+- status: provisional
+- confidence: high
+- source: L-data-v1-deliver-improve (07-17-2026); data/v1 D5 route-rework verification
+- tier: T3
+- promoted: 2026-07-17
+- last_validated: 2026-07-17
+- recurrences_after: 0
+- gate: none

@@ -2,7 +2,7 @@
 #
 # eca-metrics.sh — compute the computable-now ECA success metrics by reading the
 # feature directories under docs/features/. Definitions live in
-# .opencode/metrics/eca-metrics.md. Emits a human-readable report and writes
+# .claude/metrics/eca-metrics.md. Emits a human-readable report and writes
 # .claude/metrics/aggregated/eca-metrics.json.
 #
 # An "ECA feature" is any directory under docs/features/ that carries the ECA
@@ -111,7 +111,7 @@ echo "  Auto-escalation hit:     $(pct "$escalated" "$total")%  ($escalated/$tot
 echo "  Prototype kill rate:     $(pct "$killed" "$total")%  ($killed/$total)   (healthy — a diagnostic, not a failure)"
 echo "  Shipped:                 $shipped/$total"
 echo
-echo "Repeat-error rate lives in the learning loop — see: bash .claude/scripts/rule-stats.sh"
+echo "Repeat-error rate lives in Supabase: select tags, recurrences_after from lessons where recurrences_after > 0;"
 
 # --- json out -----------------------------------------------------------------
 mkdir -p "$(dirname "$OUT")"

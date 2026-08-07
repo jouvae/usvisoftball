@@ -42,92 +42,201 @@ The command or agent that invokes you MUST provide all necessary context:
 
 You do not read plans, scenarios, graph contexts, lessons, or rules from files. The calling agent is responsible for passing you exactly what you need to know.
 
-## Service Function Structure Standard (Concise)
+## Func Flow — the function-body structure (concise)
 
-The full canonical standard lives at `docs/service-function-structure-standard.md`. Read it for deep reference (withTx, retry loops, idempotency key design, concurrency guidance, function extraction). What follows is the implementation-critical subset you must apply to every RPC handler and major service function.
+The full canonical standard is **`.opencode/rules/go-standard.md`** (Part II §1–2 define Func Flow; read it for withTx, retry loops, idempotency key design, concurrency guidance, and function extraction). What follows is the implementation-critical subset you must apply to every RPC handler and major service function.
 
-### Seven-Phase Function Structure
+### Func Flow
 
-Every RPC handler and major service function follows these phases in this exact order. Use labeled comments only for phases the function actually uses — do not paste empty markers.
+**Func Flow** is this codebase's name for the function-body structure. Every RPC handler and major service function moves through these phases in this exact order. Use labeled comments only for phases the function actually uses — do not paste empty markers.
 
 ```
-instrument → validate → permissions → setup → query → command → respond
+instrument → validate → authenticate → idempotency → query → command → respond
 ```
 
 | Phase | What Happens | Key Rules |
 |---|---|---|
 | **instrument** | Create span, defer close, attach IDs. | First thing in the function. No spans in tiny helpers without I/O. |
-| **validate** | Pure input validation: field presence, format, ranges, enums. | Deterministic only. No I/O. No database calls. Convert proto → domain types. Initialize command structs, normalize inputs. | After this phase, proto messages must not appear until respond. Do not mutate incoming protos |
+| **validate** | Pure input validation: field presence, format, ranges, enums. Convert proto → domain command struct, normalize inputs, apply defaults. | Deterministic only. No I/O, no database calls. After this phase proto messages must not appear again until respond. Do not mutate incoming protos. |
 | **authenticate** | Call identity service to resolve caller's permission set. Reject unauthorized calls. | Always call identity service — never implement local auth logic. Produce a structured permission set, not a bare boolean. Pass it forward to query and respond. |
-| **idempotency** | Check that the request being made was not already made based on the idempotency key and the request body. | Read-only. No mutations. Reads the idempotency table and returns a 409 conflict in the event that the body id different but the key is the same. |
+| **idempotency** | Check that this request was not already made, keyed on the idempotency key **and** the request-body hash. | Read-only apart from reserving the key. Same key + same body → return the stored response. Same key + different body → `AlreadyExists`. Still in flight → `FailedPrecondition`. |
 | **query** | Load all data needed for the command. Contextual validation (existence checks) lives here. Scope queries using the permission set. | Read-only. No mutations. Reads requiring transactional consistency with a write belong inside the command transaction, not here (TOCTOU). |
 | **command** | All mutations: create/update/delete aggregates, emit events, grant permissions. Wrap in a transaction. | Mutations inside transaction boundaries only. Never call same-service RPCs internally — use internal methods. |
 | **respond** | Convert domain → proto response. Build a permission-scoped projection of the aggregate. Attach metadata, map errors. | No mutations, no expensive queries. Caller receives only sub-resources they are authorized to view. |
 
-### RPC Handler as Thin Orchestrator (Encapsulation Rule)
+**Why this order — load-progressive execution.** Each phase is cheaper than the one after it, so a
+request that is going to fail does the least possible work before failing: in-memory checks → one
+identity read → one idempotency read → domain reads → writes → serialization. A malformed request
+never reaches the identity service; an unauthorized caller never reaches the database; a duplicate
+never reaches the transaction. Phases may be **skipped** — never **reordered**.
 
-Every RPC handler must be a **thin orchestrator** — the handler body reads as a table of contents where each phase is delegated to an extracted private method. A handler exceeding ~40 lines that is not delegating to extracted methods is a code smell and must be refactored.
+**Func Flow is not only for RPC handlers.** Any function that performs one or more of these phases —
+an internal method making a network or DB call, or doing heavy computation — orders its body the
+same light-to-heavy way. A three-phase internal function is still Func Flow. Only tiny helpers, pure
+mapping functions, and small deterministic no-I/O functions are exempt.
 
-**Canonical pattern —** Each phase is a method call:
+### The step contract (encapsulation rule) — MANDATORY
+
+A phase is **never** inline code under a comment. Each phase is its own method, and every step method has the same signature:
+
 ```go
-func (s *ServiceImpl) CreateReservations(ctx context.Context, req *rsvSvr.CreateReservationsRequest) (resp *rsvSvr.CreateReservationsResponse, err error) {
-	// -- instrument -- 
+func (s *ServiceImpl) <step>(ctx context.Context, cmd <x>Command) (<x>Command, error)
+```
+
+Context in, command in — command out, error out. Nothing else. The uniform shape is what makes the handler readable: it becomes a list of steps threading one value, followable without opening a single step.
+
+Two documented exceptions, both at the transport boundary:
+- **validate** — `(ctx, *pb.XRequest) (xCommand, error)` — it builds the first command.
+- **respond** — `(ctx, xCommand) *pb.XResponse` — it consumes the last one.
+
+A **shared helper reused across handlers** (e.g. `authorizeWorkspaceAccessBulk`) may narrow to the input it needs. A step written for one handler takes the command.
+
+#### The command accumulates — it never resets
+
+**A step returns the command it received plus what it added.** The command grows down the flow; it never shrinks.
+
+```go
+// GOOD — carry forward, then add.
+func (s *ServiceImpl) authenticateCreateListings(ctx context.Context, cmd createListingsCommand) (createListingsCommand, error) {
+	permSet, err := s.resolvePermissions(ctx, cmd.CallerID, cmd.WorkspaceID)
+	if err != nil {
+		return cmd, fmt.Errorf("resolving permissions: %w", err)
+	}
+	cmd.PermissionSet = permSet // everything validate set is still here
+	return cmd, nil
+}
+
+// BAD — a fresh literal silently drops every upstream field.
+	return createListingsCommand{ // ← IdempotencyKey, Listings, WorkspaceID: gone
+		CallerID:      cmd.CallerID,
+		PermissionSet: permSet,
+	}, nil
+```
+
+**Never construct a command literal inside a step** — mutate the copy you were given and return it. Only `validate` builds a command from nothing. This compiles and passes a happy-path test while losing data silently, so the compiler will not catch it for you.
+
+On the error path return `cmd, err` — not a zero value. The caller must not read a command when `err != nil`, but returning it keeps the signature honest and keeps a partially-populated command available for error logging.
+
+#### Pass the command BY VALUE, never by pointer
+
+Steps take and return `xCommand`, never `*xCommand`.
+
+- **Memory:** a value command lives in the caller's stack frame. Take its address and hand it to a method the compiler cannot prove non-escaping, and escape analysis moves the whole struct to the heap — one allocation and one GC object per request on the service's hottest path. Value semantics keep stack data on the stack.
+- **Correctness:** each step gets its own copy, so a step physically cannot reach back and mutate the caller's command. Data flows one way, through the return value, visible in the handler body.
+
+Keep the command cheap to copy so the default stays right: scalars and IDs inline; bulk payloads as slices/maps (the header copies in a few words — you do not need a pointer to avoid copying a slice); shared infrastructure (`*gorm.DB`, clients, loggers) reached through `s`, never carried in the command. Do not embed large fixed-size arrays or deeply nested value structs.
+
+Use a pointer only deliberately, with a comment saying why: a genuinely large payload where profiling shows the copies matter (measure first), a value shared across goroutines or outliving the request, or a field that is naturally a pointer. Pointer *fields* inside a value command are fine and normal — it is the command itself that is passed by value.
+
+### RPC Handler as Thin Orchestrator
+
+The handler body reads as a table of contents. A handler exceeding ~40 lines that is not delegating to extracted steps is a code smell and must be refactored.
+
+**Canonical pattern — `CreateSourceUpload` (hermes, `create_source_upload.go`).** A live handler; read it for a worked reference.
+
+```go
+func (s *ServiceImpl) CreateSourceUpload(ctx context.Context, req *hmsSvr.CreateSourceUploadRequest) (*hmsSvr.CreateSourceUploadResponse, error) {
+	// -- instrument --
 	ctx, span := s.tracer.StartWithInfo(ctx)
 	defer span.End()
-	
-	var cmd createReservationsCommand 
-	
-	// -- validate -- 
-	cmd, err = s.validateCreateReservationsRequest(ctx, req)
-	if err != nil { return nil, err }
 
-	// -- authenticate --
-	cmd, err = s.resolvePermissions(ctx, cmd)
-	if err != nil { return nil, status.Error(codes.Internal, err.Error()) }
+	// -- validate --
+	cmd, err := s.validateCreateSourceUpload(req)
+	if err != nil {
+		return nil, err
+	}
 
-	// -- idempotency -- 
-	cmd, err = s.resolveIdempotency(ctx, cmd)
-	if err != nil { return nil, status.Error(codes.Internal, err.Error()) }
+	// -- authenticate -- (per-workspace IDOR gate on EACH item's target workspace)
+	if _, err := s.authorizeWorkspaceAccessBulk(ctx, cmd.AuthzChecks); err != nil {
+		return nil, err
+	}
 
-	// -- query -- 
-	cmd, err := s.resolveJourney(ctx, cmd)
-	if err != nil { return nil, status.Error(codes.Internal, err.Error()) }
+	// -- idempotency -- (dedupe the batch on the client key; replay ⇒ return early)
+	cmd, err = s.resolveCreateSourceUploadIdempotency(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	if cmd.Replay {
+		cmd, err = s.buildReplayResults(ctx, cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.buildCreateSourceUploadResponse(cmd), nil
+	}
 
-	// -- command -- 
-	cmd, err := s.executeReservationCreation(ctx, cmd)
-	if err != nil { return nil, status.Error(codes.Internal, err.Error()) }
-                         
-	// -- response -- 
-	return s.buildCreateReservationsResponse(ctx, cmd), nil
+	// -- command -- (land one source_document + running run per item, then enqueue parse)
+	cmd, err = s.executeCreateSourceUpload(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// -- respond --
+	return s.buildCreateSourceUploadResponse(cmd), nil
 }
 ```
 
 Key rules:
-- Each phase body is extracted into a named private method
-- Internal methods accept and return **domain types** (command structs, result structs), never proto types
-- Proto messages are converted at the validate/setup boundary and not seen again until respond
-- Each cmd object returned from a function in the pipeline is a new non-pointer cmd containing new data along with the data from previous steps
+- Every step is `(ctx, cmd) (cmd, error)`; `cmd` is **reassigned**, never shadowed into a new variable per phase
+- Internal steps speak **domain types only** — no proto after validate, none before respond
+- **Signature widening is the anti-pattern.** If steps return bespoke values, every downstream step must accept them all: `s.buildResponse(ctx, cmd, ident, journey, results)`. Absorb each result into the command instead — adding a phase then means one new field and one new line, not editing every signature after it.
+- Expensive and transactional methods (DB reads/writes, API calls, computation) **MUST** trace with the service tracer
 
-### Domain Command and Result Types
-
-Define domain types to carry data between extracted phases. These replace proto types inside the service:
-
+An internal method follows Func Flow too — the phases it needs, same contract:
 ```go
-type CreateReservationCommand struct {
-	Requests       []ReservationRequestCommand
-	Mode           ResolvedMode
-	BatchJourneyID string
-	IdempotencyKey string
-}
+// generateInspirations follows Func Flow: instrument → query → command.
+func (s *ServiceImpl) generateInspirations(ctx context.Context, cmd generateCommand) (generateCommand, error) {
+	// -- instrument --
+	ctx, span := s.tracer.StartWithInfo(ctx)
+	defer span.End()
 
-type IdentityResolutionResult struct {
-	PrimaryIdentityIDByRequest map[string]string
-	AdditionalIdentityIDs      map[string][]string
-	Cookies                    []*identity.ClientCookie
+	// -- query -- load the source material
+	cmd, err := s.loadGenerationSources(ctx, cmd)
+	if err != nil {
+		return cmd, err
+	}
+
+	// -- command -- apply the generation strategy, persist
+	return s.persistGeneratedInspirations(ctx, cmd)
 }
 ```
 
-**Never pass proto types between extracted phase methods.** Convert at the validate/setup boundary, convert back only in respond.
+### The Command Type
+
+**One command type per handler**, carrying every phase's contribution — not a family of per-phase output structs. It is the single value threading the flow, so it is defined once and grows a field per phase. Group fields by the phase that populates them, in flow order, and label them:
+
+```go
+// createReservationsCommand threads the whole CreateReservations flow. Each step
+// receives it BY VALUE, adds its own fields, and returns it. Fields are grouped
+// by the phase that populates them.
+type createReservationsCommand struct {
+	// -- validate -- (proto → domain; populated before any I/O)
+	Requests       []reservationRequestCommand
+	Mode           resolvedMode
+	BatchJourneyID string
+	IdempotencyKey string
+
+	// -- authenticate --
+	CallerID      string
+	PermissionSet permissionSet
+
+	// -- idempotency --
+	Replay        bool
+	ReplayResults []reservationResult
+
+	// -- query --
+	PrimaryIdentityIDByRequest map[string]string
+	Journey                    *journeyResolution
+
+	// -- command --
+	Results []reservationResult
+	Cookies []*identity.ClientCookie
+}
+```
+
+- **One per handler, named for the handler** — `createReservationsCommand`, not `validatePhaseOutput`. Service-local commands are **unexported**; they never leave the service package.
+- **Define it beside the handler** — command, steps, and sub-types in the same file as the RPC they serve, so the flow reads top to bottom.
+- **Never hold proto types.** Convert at the validate boundary, convert back only in respond. `global.Query` is the documented exception.
+- Genuinely reusable value objects (a `permissionSet`, a shared result row) still get their own named types — they are *fields on* the command, not replacements for it.
 
 ### Transport / Domain Separation
 
@@ -176,7 +285,7 @@ type DomainError struct {
 | `ErrInvalidInput` | `InvalidArgument` | Tier 1 validation failure |
 | `ErrNotFound` | `NotFound` | Entity doesn't exist (Tier 2) |
 | `ErrConflict` | `AlreadyExists` | Idempotency conflict |
-| `ErrForbidden` | `PermissionDenied` | Permissions phase rejection |
+| `ErrForbidden` | `PermissionDenied` | Authenticate phase rejection |
 | `ErrPreconditionFailed` | `FailedPrecondition` | Business invariant violation |
 | `ErrInternal` | `Internal` | Unexpected system failure |
 
@@ -205,7 +314,7 @@ These rules override all other guidance:
 
 1. **NO MOCKS** — Never create mock clients, mock implementations, or fake services. This codebase uses testcontainers for real dependencies.
 
-2. **FOLLOW THE STANDARD** — Every RPC handler and major service function must follow the seven-phase structure defined in the standard.
+2. **FOLLOW FUNC FLOW** — Every RPC handler and major service function must follow Func Flow (`instrument → validate → authenticate → idempotency → query → command → respond`) as defined in `.opencode/rules/go-standard.md` Part II §1–2. Phases may be skipped, never reordered.
 
 3. **GO DOC COMMENTS REQUIRED** — All new functions, methods, types, and exported constants must have Go doc comments.
 

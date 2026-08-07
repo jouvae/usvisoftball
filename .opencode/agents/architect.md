@@ -66,7 +66,7 @@ When you define RPCs during planning, you MUST also define the **Go domain comma
 **Pattern — command struct (validated, proto-free payload):**
 ```go
 // CreateReservationCommand carries the validated, proto-free request payload
-// downstream from the validate/setup phase. All fields are immutable once
+// downstream from the validate phase. All fields are immutable once
 // the command is built.
 type CreateReservationCommand struct {
 	Requests       []ReservationRequestCommand
@@ -88,7 +88,7 @@ type IdentityResolutionResult struct {
 
 **Rules for domain types:**
 - Name by domain concept, not by phase position (`CreateReservationCommand`, not `ValidatePhaseResult`)
-- Never embed proto types in these structs — convert at the validate/setup boundary
+- Never embed proto types in these structs — convert at the validate boundary
 - Place them in the service module (e.g., `modules/{svc}/service/`), not in migrations
 - Group related domain types in a file named by domain concept (e.g., `reservations_entities.go`)
 - These types ARE architectural contracts — the implementer depends on them to structure handlers as thin orchestrators

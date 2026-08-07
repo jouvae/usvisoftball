@@ -1,12 +1,17 @@
-# Service Function Structure Standard
+> **CANONICAL COPY: [`.claude/rules/go-standard.md`](../../.claude/rules/go-standard.md).** This
+> file is the `.opencode` mirror, kept in sync by hand. Edit the `.claude` copy first.
+
+# Go Service Standard — Func Flow & Patterns
 
 **Principles, Patterns & Implementation Guide**
 
-Version 2.1 · May 2026 · Internal Engineering Standard
+Version 2.2 · August 2026 · Internal Engineering Standard
 
 ---
 
 ## Contents
+
+**[Part 0: Repository Conventions](#part-0-repository-conventions)**
 
 **[Part I: Principles](#part-i-principles)**
 
@@ -20,8 +25,8 @@ Version 2.1 · May 2026 · Internal Engineering Standard
 
 **[Part II: Patterns Catalog](#part-ii-patterns-catalog)**
 
-1. [Function Phase Structure](#1-function-phase-structure)
-2. [Phase Reference](#2-phase-reference)
+1. [Func Flow](#1-func-flow)
+2. [Func Flow Phase Reference](#2-func-flow-phase-reference)
 3. [Validation Tiers](#3-validation-tiers)
 4. [The withTx Pattern](#4-the-withtx-pattern)
 5. [Transaction Boundaries](#5-transaction-boundaries)
@@ -34,6 +39,70 @@ Version 2.1 · May 2026 · Internal Engineering Standard
 12. [Function Size and Extraction](#12-function-size-and-extraction)
 
 **[Part III: Applicability](#part-iii-applicability)**
+
+---
+
+# Part 0: Repository Conventions
+
+The structural facts about *this* codebase that Parts I–III assume. They are as binding as the
+patterns below; a handler that follows Func Flow perfectly but reintroduces a `repo` package
+is still wrong.
+
+## 0.1 Service layer owns the database directly
+
+There is **no `repo` package and no `Repository` interface** in new or refactored services. The
+service layer uses `gormClient` directly and owns transactions directly:
+
+```go
+s.gormClient.WithContext(ctx).Model(&Listing{}).Where(…).Find(&rows)
+
+s.gormClient.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	svc := s.withTx(tx)
+	return svc.executeListingCommand(ctx, cmd)
+})
+```
+
+Live reference template: `services/alpha/modules/reservations/service/` (**not** the decommissioning
+`novella` service). Endorsed query patterns: `docs/db-rules.md`.
+
+## 0.2 Each service owns its domain types
+
+Define entity types **inside the service directory** as `package service` (`models_*.go`, mirroring
+the reservations service). Do **not** import domain entity types from `libs/go/postgres/migrations` —
+that shared package is legacy and services are migrating off it. When localizing a legacy type, keep
+only the fields and methods the service actually uses, and preserve any serialized (e.g. Meilisearch
+JSONB) shape.
+
+## 0.3 Schema comes from versioned SQL migrations, not AutoMigrate
+
+Tables, columns, indexes, and constraints are created by **goose SQL migrations** under
+`data/migrations/{service}/`, applied by `make {service}-migrate`. **`gorm.AutoMigrate` is frozen
+legacy** — it still runs at boot for un-migrated services, but nothing new goes into it, and a
+goose-owned model must never be registered in `doAutoMigrations`.
+
+Full rules — migration authoring, the runner's invariants, model/tag discipline, hook discipline,
+ID prefixes, and test wiring — live in **`.opencode/rules/data.md`**. Read it before touching a model,
+a migration, or `repo_init.go`.
+
+## 0.4 Generated code is generated
+
+Never hand-edit anything under `apis/pb/go/**`. Change the `.proto`, then run `make apis`.
+
+## 0.5 Authorization is not local
+
+Services do not implement their own authorization logic. Permission decisions come from the identity
+service / SpiceDB and arrive as a structured permission set (Part I §3, Part II §2.3). Every
+workspace-scoped RPC authorizes against the **owning** workspace before any DB operation — enforced
+independently of any prompt rule by `libs/scripts/check-workspace-authz.sh` (`make check-authz`, CI,
+and the Deliver Node-3 pre-gate). A new tenant-scoped RPC must be added to that script's
+`AUTHZ_ENFORCED` list.
+
+## 0.6 Tests exercise the RPC surface
+
+Service tests call the service through its gRPC client using one global fixture per test package
+(`init_test.go` / `TestMain`), with shared setup from `libs/go/tests` and service-specific helpers in
+the service's own `tests/` directory. Never seed by bypassing an entity's RPC — a non-ULID id is the
+tell. Details: `.opencode/agents/go-tester.md`.
 
 ---
 
@@ -59,7 +128,7 @@ This separation means internal functions never accept or return proto messages. 
 
 All validation must complete before any mutation, downstream call, or expensive computation begins. If a request is going to fail, it should fail cheaply. This principle reduces partial-failure states, wasted compute, and complexity in rollback logic.
 
-Validation is not monolithic, however. Pure input validation (field presence, format, range) is distinct from permission resolution (identity service calls) and contextual validation (existence checks) that require I/O. All three must complete before writes, but they have different dependencies, testing characteristics, and outputs. See Part II for the validation tiers and the permissions phase.
+Validation is not monolithic, however. Pure input validation (field presence, format, range) is distinct from permission resolution (identity service calls) and contextual validation (existence checks) that require I/O. All three must complete before writes, but they have different dependencies, testing characteristics, and outputs. See Part II for the validation tiers and the authenticate phase.
 
 ---
 
@@ -107,25 +176,209 @@ These patterns implement the principles from Part I. They are expected to evolve
 
 ---
 
-## 1. Function Phase Structure
+## 1. Func Flow
 
-Every RPC handler and major service-layer function follows a seven-phase conceptual order. The phases always appear in this sequence. Use labeled comments only for phases the function actually uses; do not paste empty phase markers.
+**Func Flow** is the name of this codebase's function-body structure. Every RPC handler and every
+major service-layer function moves through the same seven phases, in the same order:
+
+```
+instrument → validate → authenticate → idempotency → query → command → respond
+```
+
+Use labeled comments only for the phases the function actually uses; do not paste empty phase
+markers.
 
 | Phase | Purpose | Allowed Operations |
 |---|---|---|
-| **instrument** | Initialize telemetry, create spans, attach structured logging context and correlation IDs. | Span creation, attribute attachment, metric counters. |
-| **validate** | Pure input validation: field presence, format, ranges, enum membership, mode compatibility. | Deterministic checks only. No I/O. |
-| **permissions** | Resolve the caller's permission set by calling the identity service. Reject unauthorized calls. Produce a scoped permission set that flows into query and respond. | Identity service RPC reads. No mutations. |
-| **setup** | Convert proto messages to domain types, initialize command structs, normalize inputs, apply defaults. | Type conversion, default population, struct initialization. |
-| **query** | Retrieve all data needed for execution. Contextual validation (existence) happens here. Scope queries using the resolved permission set where applicable. | DB reads, downstream RPC reads, cache reads. |
+| **instrument** | Initialize telemetry, create the span, attach structured logging context and correlation IDs. | Span creation, attribute attachment, metric counters. |
+| **validate** | Pure input validation — field presence, format, ranges, enum membership, mode compatibility — and conversion of proto into the domain command struct. | Deterministic checks and type conversion only. No I/O. |
+| **authenticate** | Resolve the caller's permission set by calling the identity service. Reject unauthorized calls. The permission set flows into query and respond. | Identity service reads. No mutations. |
+| **idempotency** | Check whether this request was already made, keyed on the idempotency key **and** the request body. | Idempotency-table reads. No mutations. Same key + different body → `AlreadyExists`. |
+| **query** | Retrieve everything the command needs. Contextual validation (existence) happens here. Scope reads with the resolved permission set. | DB reads, downstream RPC reads, cache reads. |
 | **command** | Perform all mutations: create/update/delete aggregates, emit events, grant permissions. | DB writes, event creation, transactional operations. |
-| **respond** | Convert domain models to transport response. Build a projection of the aggregate scoped to the caller's permissions. Attach metadata, map errors to transport codes. | Proto construction, projection filtering, header attachment, error mapping. |
+| **respond** | Convert domain models to the transport response. Build a projection scoped to the caller's permissions. Attach metadata, map errors to transport codes. | Proto construction, projection filtering, header attachment, error mapping. |
 
-> **Key Change from v1:** Permission checks are now a dedicated phase (`permissions`) that runs immediately after validation, rather than being mixed into the query phase. The permissions phase calls the identity service, resolves the caller's permission set, and that set is used to scope both queries and the response projection. Lightweight DB existence checks have moved from `validate` to `query`. The validate phase is now purely deterministic.
+### 1.1 Why this order — load-progressive execution
+
+The order is not alphabetical or historical. **Each step is cheaper than the one after it**, so a
+request that is going to fail does the least possible work before failing:
+
+```
+in-memory checks → one identity read → one idempotency read → domain reads → writes → serialization
+     (µs)              (one RPC)          (one indexed read)     (I/O)      (txn)       (CPU)
+```
+
+A malformed request never reaches the identity service. An unauthorized caller never reaches the
+database. A duplicate request never reaches the transaction. This is the *Fail Before You Mutate*
+principle (Part I §2) expressed as a function body — and it is the reason phases may be **skipped**
+but never **reordered**.
+
+### 1.2 The step contract — every phase is an encapsulated step
+
+A phase is not a block of inline code with a comment above it. **Each phase is its own method, and
+every step method has the same shape:**
+
+```go
+func (s *ServiceImpl) <step>(ctx context.Context, cmd <x>Command) (<x>Command, error)
+```
+
+Context in, command in — command out, error out. Nothing else. That uniformity is what makes the
+handler body readable at a glance: it becomes a list of steps that thread one value through,
+and a reader can follow the whole request without opening a single step.
+
+```go
+func (s *ServiceImpl) CreateListings(ctx context.Context, req *rsvSvr.CreateListingsRequest) (*rsvSvr.CreateListingsResponse, error) {
+	// ── instrument ──
+	ctx, span := s.tracer.StartWithInfo(ctx)
+	defer span.End()
+
+	// ── validate ──
+	cmd, err := s.validateCreateListings(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// ── authenticate ──
+	cmd, err = s.authenticateCreateListings(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// ── idempotency ──
+	cmd, err = s.resolveCreateListingsIdempotency(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	if cmd.Replay != nil {
+		return cmd.Replay, nil
+	}
+
+	// ── query ──
+	cmd, err = s.resolveCreateListingsRefs(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// ── command ──
+	cmd, err = s.executeCreateListings(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// ── respond ──
+	return s.buildCreateListingsResponse(ctx, cmd), nil
+}
+```
+
+The two boundary steps are the documented exceptions to the uniform signature, because they are
+where transport meets domain:
+
+- **validate** takes the proto request and returns the first command: `(ctx, *pb.XRequest) (xCommand, error)`.
+- **respond** takes the final command and returns the proto response: `(ctx, xCommand) *pb.XResponse`.
+
+Every step in between is `(ctx, cmd) (cmd, error)`.
+
+#### The command accumulates — it never resets
+
+**A step returns the command it received, plus whatever it added or changed.** The command grows as
+it moves down the flow; it never shrinks.
+
+```go
+// GOOD — carry the input forward, then add.
+func (s *ServiceImpl) authenticateCreateListings(ctx context.Context, cmd createListingsCommand) (createListingsCommand, error) {
+	permSet, err := s.resolvePermissions(ctx, cmd.CallerID, cmd.WorkspaceID)
+	if err != nil {
+		return cmd, fmt.Errorf("resolving permissions: %w", err)
+	}
+	cmd.PermissionSet = permSet // everything validate set is still here
+	return cmd, nil
+}
+
+// BAD — constructs a fresh command and silently drops every upstream field.
+func (s *ServiceImpl) authenticateCreateListings(ctx context.Context, cmd createListingsCommand) (createListingsCommand, error) {
+	permSet, err := s.resolvePermissions(ctx, cmd.CallerID, cmd.WorkspaceID)
+	if err != nil {
+		return createListingsCommand{}, err
+	}
+	return createListingsCommand{ // ← IdempotencyKey, Listings, WorkspaceID: all gone
+		CallerID:      cmd.CallerID,
+		PermissionSet: permSet,
+	}, nil
+}
+```
+
+The `BAD` shape compiles, passes a happy-path test that only asserts the fields the step happens to
+copy, and loses data silently. Never build a command literal inside a step — mutate the received
+copy and return it. Only `validate` constructs a command from nothing.
+
+On the error path, return the command you were given (`return cmd, err`), not a zero value. The
+caller must not read a command when `err != nil`, but returning `cmd` keeps the signature honest and
+keeps a partially-populated command available to error logging.
+
+#### Pass the command by value, not by pointer
+
+**Steps take and return `xCommand`, never `*xCommand`.** This is deliberate on two grounds:
+
+*Memory.* A command passed by value lives in the caller's stack frame. Take its address and hand
+that to a method the compiler cannot prove is non-escaping, and Go's escape analysis moves the whole
+struct to the heap — one allocation and one GC object per request, on the hottest path in the
+service. Value semantics keep stack data on the stack.
+
+*Correctness.* Each step gets its own copy, so a step physically cannot reach back and mutate the
+caller's command. Data flows one way, through the return value, and it is visible in the handler
+body. With a `*xCommand`, a step can mutate state the handler never assigned, and the handler stops
+being a readable table of contents.
+
+Keep the command cheap to copy so the default stays right:
+
+- ✓ Scalars, small fixed-size fields, and IDs go directly in the struct.
+- ✓ Bulk payloads go in as slices/maps — the header copies in a few words and the backing array is
+  already shared; you do not need a pointer to avoid copying a slice.
+- ✓ Shared infrastructure (`*gorm.DB`, clients, loggers) is reached through `s`, not carried in the
+  command.
+- ✗ Do not embed large fixed-size arrays or deeply nested value structs; that is what makes copying
+  expensive, and the fix is to restructure the command, not to pointerize it.
+
+**When the heap is the right answer** — use a pointer deliberately, and say why in a comment:
+
+- The command genuinely carries a large payload copied at every step and profiling shows the copies
+  matter. Measure first; do not assume.
+- The value must be shared across goroutines (e.g. an `errgroup` fan-out in the query phase) or must
+  outlive the request scope.
+- A field is naturally a pointer already (a loaded aggregate, a nil-able optional). Pointer *fields*
+  inside a value command are fine and normal — it is the command itself that is passed by value.
+
+### 1.3 Func Flow is not only for RPC handlers
+
+Any function that performs one or more of the phases follows the same progression — an internal
+method that makes a network or DB call, or does heavy computation, orders its body light-to-heavy in
+exactly this way. The labels are conceptual; a three-phase internal function is still Func Flow, and
+its steps follow the same `(ctx, cmd) (cmd, error)` contract when it has more than one.
+
+```go
+// generateInspirations follows Func Flow: instrument → query → command → respond.
+func (s *ServiceImpl) generateInspirations(ctx context.Context, cmd generateCommand) (generateCommand, error) {
+	// ── instrument ──
+	ctx, span := s.tracer.StartWithInfo(ctx)
+	defer span.End()
+
+	// ── query ── load the source material
+	cmd, err := s.loadGenerationSources(ctx, cmd)
+	if err != nil {
+		return cmd, err
+	}
+
+	// ── command ── apply the generation strategy, persist
+	return s.persistGeneratedInspirations(ctx, cmd)
+}
+```
+
+Functions genuinely exempt from Func Flow are listed in Part III: tiny helpers, pure mapping
+functions, and small deterministic functions with no I/O.
 
 ---
 
-## 2. Phase Reference
+## 2. Func Flow Phase Reference
 
 ### 2.1 instrument
 
@@ -158,9 +411,9 @@ Validation functions should return structured internal models whenever possible,
 params, err := validateCreateReservationInput(req)
 ```
 
-### 2.3 permissions
+### 2.3 authenticate
 
-The permissions phase resolves the caller's identity and authorization. This always involves a call to the identity service's permissions RPCs. The output is a resolved permission set: a structured representation of what the caller is allowed to do and what aggregate sub-resources they are allowed to see.
+The authenticate phase resolves the caller's identity and authorization. This always involves a call to the identity service's permissions RPCs. The output is a resolved permission set: a structured representation of what the caller is allowed to do and what aggregate sub-resources they are allowed to see.
 
 ```go
 permSet, err := s.identityClient.ResolvePermissions(ctx, &identity.ResolvePermissionsRequest{
@@ -195,25 +448,40 @@ cmd.PermissionSet = permSet
 - ✗ Load domain data (that belongs in query).
 - ✗ Cache permission results across requests without explicit TTL and invalidation strategy.
 
-> **Why a dedicated phase?** Permissions are not a contextual validation check like "does this entity exist." They are an external service call that produces a structured result used by multiple downstream phases. Burying them in the query phase obscures the authorization boundary, makes it unclear when the access decision happens, and leads to inconsistent projection logic across handlers.
+> **Why a dedicated phase?** Authorization is not a contextual validation check like "does this entity exist." It is an external service call that produces a structured result used by multiple downstream phases. Burying it in the query phase obscures the authorization boundary, makes it unclear when the access decision happens, and leads to inconsistent projection logic across handlers.
 
-### 2.4 setup
+### 2.4 idempotency
 
-Convert any remaining transport types into domain types. After this phase, protobuf messages should not appear again until the respond phase.
+If the request carries an idempotency key, resolve it **before** any domain read or write. This phase is read-only: it looks up the stored record for `(service, key)` and decides one of three outcomes.
 
 ```go
-cmd := &CreateReservationCommand{
-    ExperienceID: params.ExperienceID,
-    StartDate:    params.StartDate,
+cmd, err := s.resolveIdempotency(ctx, cmd)
+if err != nil {
+    return nil, err
+}
+if cmd.CachedResponse != nil {
+    return cmd.CachedResponse, nil // replay — indistinguishable from the first call
 }
 ```
 
-- ✗ Mutate incoming proto messages.
-- ✗ Perform persistence or orchestration.
+| Stored state | Outcome |
+|---|---|
+| No record | Proceed. Reserve the key as `IN_PROGRESS` so a concurrent retry cannot double-execute. |
+| `COMPLETED`, **same** request-body hash | Return the stored response. A duplicate must be indistinguishable from a successful first attempt. |
+| `COMPLETED`, **different** request-body hash | `AlreadyExists` — the key was reused for a different request. |
+| `IN_PROGRESS` | `FailedPrecondition` — the original call is still running. |
+
+- ✓ Hash the request body and compare it; a key alone is not enough to prove sameness.
+- ✓ Let PostgreSQL's unique constraint be the enforcement mechanism (Part I §6) — this phase is the
+  fast path, not the guarantee.
+- ✗ Perform any mutation other than reserving the key.
+- ✗ Deduplicate in Redis or in process memory.
+
+Key design — client-generated vs server-derived, scoping, retention — is in §7.
 
 ### 2.5 query
 
-Retrieve everything the command phase will need. This is also where contextual validation lives: checking that referenced entities exist, resolving identities. These operations require I/O and are not deterministic, so they do not belong in the validate phase. Use the resolved permission set from the permissions phase to scope queries where applicable — for example, loading only the components the caller is authorized to view rather than the full aggregate.
+Retrieve everything the command phase will need. This is also where contextual validation lives: checking that referenced entities exist, resolving identities. These operations require I/O and are not deterministic, so they do not belong in the validate phase. Use the resolved permission set from the authenticate phase to scope queries where applicable — for example, loading only the components the caller is authorized to view rather than the full aggregate.
 
 **Reads that must be transactionally consistent with a subsequent write belong inside the command transaction, not here.** The query phase handles reads that inform whether to proceed. Reads that must see the exact state being mutated (e.g., checking a row's version before updating it) must happen inside the same transaction as the write. Splitting them introduces TOCTOU race conditions.
 
@@ -240,9 +508,9 @@ s.initializeReservationGraph(...)
 
 ### 2.7 respond
 
-Convert domain models back into transport types. Attach cookies, tokens, headers, pagination metadata. Map domain errors to gRPC status codes. This is the only place proto construction should happen after the setup phase.
+Convert domain models back into transport types. Attach cookies, tokens, headers, pagination metadata. Map domain errors to gRPC status codes. This is the only place proto construction should happen after the validate phase.
 
-**Build the response projection using the permission set from the permissions phase.** The caller receives only the aggregate sub-resources they are authorized to view. For example, a `GetReservation` response for a participant might include the reservation dates and their own component, while omitting payment shares, other participants' components, and internal drifts.
+**Build the response projection using the permission set from the authenticate phase.** The caller receives only the aggregate sub-resources they are authorized to view. For example, a `GetReservation` response for a participant might include the reservation dates and their own component, while omitting payment shares, other participants' components, and internal drifts.
 
 ```go
 // Build projection scoped to caller's permissions
@@ -356,6 +624,11 @@ func (s *ServiceImpl) initializeReservationGraph(
 ) error
 ```
 
+> **Steps vs. helpers.** This section governs *helpers* — functions a step calls to do one job, which
+> take the narrow domain input they need. A **step** (a Func Flow phase method) is different: it
+> always takes and returns the command, `(ctx, cmd) (cmd, error)` (§1.2). If you are extracting a
+> phase, write a step. If you are extracting work *inside* a phase, write a helper.
+
 ---
 
 ## 9. Error Handling
@@ -381,7 +654,7 @@ The respond phase (or a shared middleware) maps domain error codes to gRPC statu
 | `ErrInvalidInput` | `InvalidArgument` | Tier 1 validation failures. |
 | `ErrNotFound` | `NotFound` | Entity does not exist (Tier 2). |
 | `ErrConflict` | `AlreadyExists` | Idempotency conflict, duplicate creation. |
-| `ErrForbidden` | `PermissionDenied` | Authorization failure (permissions phase). |
+| `ErrForbidden` | `PermissionDenied` | Authorization failure (authenticate phase). |
 | `ErrPreconditionFailed` | `FailedPrecondition` | Business invariant violation. |
 | `ErrInternal` | `Internal` | Unexpected system failure. |
 
@@ -443,11 +716,23 @@ Structured logging complements tracing. Each phase has different logging expecta
 - ✗ Log full request or response payloads (PII risk, log volume).
 - ✗ Log at Info level inside tight loops or per-row operations.
 
+## 11.1 Tracing Expectations
+
+- Expnsive and transactional methods (e.g. methods that do database reads and writes, api calls, computation, etc) **MUST** implement tracing using the service tracer. 
+```go
+func (s *ServiceImpl) generateInspiration(ctx) ([]*Insipiration, error) {
+	// instrument
+	// query 
+	// command: apply generation strategy
+	// command: save to db
+	// response: inspirations
+}
+```
 ---
 
 ## 12. Function Size and Extraction
 
-RPC handlers should remain orchestration-oriented. They coordinate the seven phases but delegate complex logic to extracted functions.
+RPC handlers should remain orchestration-oriented. They coordinate the Func Flow phases but delegate complex logic to extracted functions.
 
 When a function exceeds reasonable complexity, extract along phase boundaries: query functions that load and assemble data, command functions that perform atomic aggregate operations, and workflow functions that coordinate multi-step processes.
 
@@ -461,60 +746,83 @@ When a function exceeds reasonable complexity, extract along phase boundaries: q
 
 Every RPC handler must be a thin orchestrator. The handler's body must read as a table of contents — each phase body is extracted into a named private method with a descriptive name. A handler exceeding ~40 lines that is not delegating to extracted methods is a code smell.
 
-**Canonical pattern — `CreateReservations` (reservations service):**
+**Canonical pattern — `CreateSourceUpload` (hermes service, `create_source_upload.go`).** This is a
+live handler, not an idealized sketch; read it when you need a worked reference.
 
 ```go
-// CreateReservations is the canonical entry point for aggregate-oriented
-// reservation creation. Flow: validate → resolve identities → resolve journey
-// → execute (idempotency + aggregate transaction) → grant permissions →
-// respond.
-func (s *ServiceImpl) CreateReservations(ctx context.Context, req *rsvSvr.CreateReservationsRequest) (*rsvSvr.CreateReservationsResponse, error) {
+func (s *ServiceImpl) CreateSourceUpload(ctx context.Context, req *hmsSvr.CreateSourceUploadRequest) (*hmsSvr.CreateSourceUploadResponse, error) {
+	// -- instrument --
 	ctx, span := s.tracer.StartWithInfo(ctx)
 	defer span.End()
 
-	// ── validate + setup ──
-	cmd, err := s.validateCreateReservationsRequest(ctx, req)
+	// -- validate --
+	cmd, err := s.validateCreateSourceUpload(req)
 	if err != nil {
-		s.logger.Err(fmt.Errorf("failed to validate create reservations request: %v", err)).Send()
 		return nil, err
 	}
 
-	// ── permissions ──
-	// ***** TODO: need to implement permission checking.
-
-	// ── query: identities + journey ──
-	ident, err := s.resolveIdentities(ctx, cmd)
-	if err != nil {
-		s.logger.Err(fmt.Errorf("failed to resolve identities: %v", err)).Send()
-		return nil, status.Error(codes.Internal, err.Error())
+	// -- authenticate -- (per-workspace IDOR gate on EACH item's target workspace)
+	if _, err := s.authorizeWorkspaceAccessBulk(ctx, cmd.AuthzChecks); err != nil {
+		return nil, err
 	}
 
-	journey, err := s.resolveJourney(ctx, cmd, ident)
+	// -- idempotency -- (dedupe the batch on the client key; replay ⇒ return early)
+	cmd, err = s.resolveCreateSourceUploadIdempotency(ctx, cmd)
 	if err != nil {
-		s.logger.Err(fmt.Errorf("failed to resolve journey: %v", err)).Send()
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
+	}
+	if cmd.Replay {
+		cmd, err = s.buildReplayResults(ctx, cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.buildCreateSourceUploadResponse(cmd), nil
 	}
 
-	// ── command: aggregate persistence (idempotency + transaction) ──
-	results, err := s.executeReservationCreation(ctx, cmd, ident, journey)
+	// -- command -- (land one source_document + running run per item, then enqueue parse)
+	cmd, err = s.executeCreateSourceUpload(ctx, cmd)
 	if err != nil {
-		s.logger.Err(fmt.Errorf("failed to execute reservation creation: %v", err)).Send()
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
 
-	// ── command: permissions after commit ──
-	s.createPermissions(ctx, cmd, results)
-
-	// ── respond ──
-	return s.buildCreateReservationsResponse(ctx, cmd, ident, journey, results), nil
+	// -- respond --
+	return s.buildCreateSourceUploadResponse(cmd), nil
 }
 ```
 
 Key traits:
-- Handler is ~40 lines, each phase is a single method call
-- Internal methods return **domain types** (not proto): `CreateReservationCommand`, `IdentityResolutionResult`, `JourneyResolution`, `ReservationAggregateResult`
-- Data flows explicitly: each method consumes previous results and produces typed outputs
-- Phase comments act as section headers
+- Handler is ~35 lines; every phase is a single method call.
+- Every step is `(ctx, cmd) (cmd, error)` (§1.2) — one value threads the whole flow, and `cmd` is
+  reassigned, never shadowed into a new variable per phase.
+- Steps take and return the command **by value**; `cmd.Replay`, `cmd.AuthzChecks`, and the results
+  are fields the earlier steps added, still present at respond.
+- Internal steps speak **domain types only** — no proto after validate, none before respond.
+- Phase comments act as section headers; the handler reads as a table of contents.
+
+> **Shared helpers are the one narrowing exception.** `authorizeWorkspaceAccessBulk` is a
+> cross-RPC authorization helper, so it takes the narrow input it needs (`cmd.AuthzChecks`) rather
+> than the whole command. Helpers reused across handlers may narrow; **steps written for one
+> handler take the command.** Do not use this to justify a per-RPC step with a bespoke signature.
+
+**Signature-widening anti-pattern.** When steps return bespoke values instead of the command, every
+downstream step has to accept them all, and the signatures grow monotonically:
+
+```go
+// BAD — each step adds a parameter; by respond there are five.
+ident,   err := s.resolveIdentities(ctx, cmd)
+journey, err := s.resolveJourney(ctx, cmd, ident)
+results, err := s.executeReservationCreation(ctx, cmd, ident, journey)
+return s.buildCreateReservationsResponse(ctx, cmd, ident, journey, results), nil
+
+// GOOD — the command absorbs each result; signatures stay fixed.
+cmd, err = s.resolveIdentities(ctx, cmd)
+cmd, err = s.resolveJourney(ctx, cmd)
+cmd, err = s.executeReservationCreation(ctx, cmd)
+return s.buildCreateReservationsResponse(ctx, cmd), nil
+```
+
+Adding a phase to the `BAD` shape means editing every signature after it. In the `GOOD` shape it
+means adding one field to the command and one line to the handler.
 
 **Anti-pattern — `CreatePaymentIntent` (finance service):**
 
@@ -551,9 +859,9 @@ func (s *ServiceImpl) CreatePaymentIntent(ctx context.Context, req *finSvc.Creat
 		return nil, status.Error(codes.InvalidArgument, "line item sum does not match invoice total")
 	}
 
-	// --- permissions (TODO) ---
+	// --- authenticate (TODO) ---
 
-	// --- setup (inline variable extraction) ---
+	// --- setup: inline variable extraction (there is no `setup` phase — this belongs in validate) ---
 	invoiceID := invoice.GetId()
 	total := invoice.GetTotal()
 	paymentShares := invoice.GetPaymentShares()
@@ -623,42 +931,61 @@ Problems:
 - No domain command types — proto types (`*finSvc.CreatePaymentIntentRequest`) and raw proto fields flow through the entire function
 - Response construction is inline, interleaved with idempotency record updates
 
-### 12.2 Domain Command and Result Types
+### 12.2 The Command Type
 
-Every multi-phase RPC handler should define domain types that carry data between phases. These types serve as the contract between extraction boundaries and make the data flow explicit and type-safe.
+**One command type per handler**, carrying every phase's contribution. It is the single value that
+threads the flow (§1.2), so it is defined once and grows a field per phase — not a family of
+per-phase output structs.
+
+Group the fields by the phase that populates them, in flow order, and say so in comments. A reader
+should be able to tell at a glance which phase owns a field, and a step author should be able to tell
+which fields are already populated by the time their step runs.
 
 ```go
-// CreateReservationCommand carries the validated, proto-free request payload
-// downstream from the validate phase. All fields are immutable once the
-// command is built.
-type CreateReservationCommand struct {
-	Requests       []ReservationRequestCommand
-	Mode           ResolvedMode
+// createReservationsCommand threads the whole CreateReservations flow. Each step
+// receives it by value, adds its own fields, and returns it (§1.2). Fields are
+// grouped by the phase that populates them.
+type createReservationsCommand struct {
+	// -- validate -- (proto → domain; populated before any I/O)
+	Requests       []reservationRequestCommand
+	Mode           resolvedMode
 	BatchJourneyID string
 	IdempotencyKey string
-}
 
-// IdentityResolutionResult is the output of the resolve-identities phase.
-type IdentityResolutionResult struct {
+	// -- authenticate --
+	CallerID      string
+	PermissionSet permissionSet
+
+	// -- idempotency --
+	Replay       bool
+	ReplayResults []reservationResult
+
+	// -- query --
 	PrimaryIdentityIDByRequest map[string]string
 	AdditionalIdentityIDs      map[string][]string
-	Cookies                    []*identity.ClientCookie
-}
+	Journey                    *journeyResolution
 
-// ReservationAggregateResult is the persisted output of one aggregate creation.
-type ReservationAggregateResult struct {
-	RequestID         string
-	Reservation       *migrations.Reservation
-	Request           *migrations.ReservationRequest
-	Err               error
-	PermissionWarning string
+	// -- command --
+	Results []reservationResult
+	Cookies []*identity.ClientCookie
 }
 ```
 
-Protocol for domain types:
-- **Name by domain concept**, not by phase position (e.g., `CreateReservationCommand`, not `ValidatePhaseOutput`)
-- **Group related domain types** in a single file alongside the methods that produce/consume them (e.g., `reservations_entities.go`)
-- **Never pass proto types** between extracted phase methods — convert at the validate/setup boundary and convert back only in respond
+Protocol for the command type:
+
+- **One per handler, named for the handler** — `createReservationsCommand`, not `validatePhaseOutput`.
+  Service-local commands are **unexported**; they never leave the service package.
+- **Cheap to copy** (§1.2): scalars and IDs inline, bulk payloads as slices/maps, shared
+  infrastructure reached through `s` and never carried in the command.
+- **A step mutates its copy and returns it.** Never construct a command literal inside a step; only
+  `validate` builds one from nothing.
+- **Never hold proto types.** Convert at the validate boundary, convert back only in respond.
+  `global.Query` is the documented exception (Part I §1).
+- **Define it beside the handler** — the command, its steps, and its sub-types live in the same file
+  as the RPC they serve (e.g. `create_source_upload.go`), so the whole flow reads top to bottom.
+
+Genuinely reusable value objects (a `permissionSet`, a shared result row) still get their own named
+types — they are *fields on* the command, not replacements for it.
 
 ---
 
@@ -677,7 +1004,7 @@ This standard is mandatory for all new development in the reservation system and
 
 ## Exempt Scope
 
-The following function types are exempt from the phase structure. They should still follow general Go best practices but do not require labeled phases:
+The following function types are exempt from Func Flow. They should still follow general Go best practices but do not require labeled phases:
 
 - Tiny helper functions
 - Pure utility functions

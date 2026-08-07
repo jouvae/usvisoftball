@@ -90,7 +90,7 @@ plus a greenfield mode and the kill/pivot + status hooks.
    *tests*, NOT from the repository's coding standards, because it is promoted as-is through
    `/actualize` — standards debt compounds if you let it in here. Every implementer you spawn
    must follow the established rules; brief them with the relevant standard and reject violations:
-   - `go-implementer` → `.opencode/agents/go-implementer.md`: seven-phase **thin-orchestrator**
+   - `go-implementer` → `.opencode/agents/go-implementer.md`: **Func Flow** thin-orchestrator
      RPCs (domain types between phases, proto only at validate/respond) and **direct GORM via the
      `gormClient`/`gormClient` on `ServiceImpl` per `docs/db-rules.md`** — never the abolished
      `repo.Repository` interface or the `global.Query` term-translation path for service-layer
@@ -104,7 +104,7 @@ plus a greenfield mode and the kill/pivot + status hooks.
 2. **Shape** — spawn **architect** to sketch the slice.
 3. **QA the sketch** — `go-qa-reviewer` and/or `nextjs-qa-reviewer` as relevant.
 4. **Data path** — existing RPC? use it. New/changed RPC? **`go-tester` writes the service integration
-   test(s)** for the slice's scenario(s) → **`go-implementer`** makes them pass (seven-phase +
+   test(s)** for the slice's scenario(s) → **`go-implementer`** makes them pass (Func Flow +
    `gormClient`/`docs/db-rules.md`; **never bypass an entity's RPC to seed**). Do **NOT** skip `go-tester` —
    the integration test (run `go test -tags testmode`) IS the backend verification. **Add the Dorothy
    `/api/v1/...` proxy route for any new RPC the UI/e2e will call.**
@@ -190,7 +190,7 @@ docs stay current every time regardless.)
 ## Constraints
 
 - Never write implementation or test code yourself — orchestrate the agents.
-- Prototype code MUST still meet the repo coding standards (RPC seven-phase / thin orchestrator;
+- Prototype code MUST still meet the repo coding standards (Func Flow / thin orchestrator;
   direct GORM via `gormClient`/`gormClient`, never the repository interface, per `docs/db-rules.md`;
   design-system; `apiClient` not raw fetch). Brief implementers with the standard and verify a
   clean build / typecheck.

@@ -17,15 +17,17 @@ Loaded by `.opencode/agents/reviewer.md`. Schema + lifecycle:
 - gate: none
 
 ### R-reviewer-bola-body-id
-- trigger: reviewing an RPC that acts on a request-body `subject_id`/`workspace_id`/`resource_id`
-- rule: require a server-side `CheckAccess` on that object; caller identity must come from the session token, not the body, unless gated by platform-admin
+- trigger: reviewing an RPC that acts on a request-body `subject_id`/`workspace_id`/`resource_id` (OR a scope taken from an HTTP header like `Active-Workspace-Slug`)
+- rule: require a server-side `CheckAccess` on that object BEFORE any read/write; caller identity must come from the session token, not the body/header, unless gated by platform-admin. A `!= ""` presence check, a check that no-ops when the header is absent, or an empty-scope fall-through to an unscoped all-tenant query are all NON-authorization.
 - status: binding
 - confidence: high
-- source: audit-report.md H9/H10/H11/M10
+- classification: SECURITY
+- source: audit-report.md H9/H10/H11/M10; RECURRED in L-data-v1-deliver-security-authz (07-19-2026)
 - promoted: 2026-06-24
-- last_validated: 2026-06-24
-- recurrences_after: 0
-- gate: none
+- last_validated: 2026-07-19
+- recurrences_after: 1
+- gate: script:libs/scripts/check-workspace-authz.sh
+- note: Recurred in data/v1 (cross-tenant IDOR) because the 3D Deliver flow does not invoke the `reviewer` agent — the prompt rule never fired; red-team caught it. REMEDIATED 2026-07-19 by moving down the ladder: the deterministic gate `check-workspace-authz.sh` now enforces this flow-independently (CI `test-alpha` + Deliver Node-3 pre-gate + `make check-authz`). The reviewer prompt rule stays as defense-in-depth for the BDD flow (semantic authz the grep can't verify); the gate is the backstop that closes the unapplied-in-3D-flow gap.
 
 ### R-reviewer-cross-ref-enum-consumers
 - trigger: reviewing a change that adds an enum value or a new response field
@@ -51,11 +53,7 @@ Loaded by `.opencode/agents/reviewer.md`. Schema + lifecycle:
 - gate: none
 - note: SECURITY rule — `binding` promotion requires the security-review gate. Eventual target: port the status/timing-parity check to `.claude/scripts/` (gate) once stable.
 
----
+<!-- Tombstone R-reviewer-repository-pattern (retired 2026-06-24) DELETED at consolidation
+2026-07-19 — one cycle elapsed; the Repository pattern is abolished and durably documented in
+go-standard.md + the 06-26-2026-inspirations-refactor-01 lesson. Lessons files are never deleted. -->
 
-## Retired (tombstones — delete after next consolidation)
-
-### R-reviewer-repository-pattern  — RETIRED 2026-06-24
-- was: "Generic `Get()` with Query pattern; repo returns `migrations.*`; tests in `suite_apis_test.go`"
-- reason: the Repository pattern was ABOLISHED (`go-implementer`: use `gormClient` directly; `go-tester`: tests in `tests/` with `TestMain`/`TestFixture`, not testify). This rule contradicted current standards and caused the reviewer to flag correct code. Removed from the reviewer agent on 2026-06-24.
-- status: retired

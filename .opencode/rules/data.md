@@ -1,505 +1,340 @@
-> **⚠️ SUPERSEDED IN PART (2026-06-26) — no `repo` package.** Services no longer wrap DB
-> access in a `repo` package or a per-query `Repository` interface. The **service layer uses
-> `gormClient` directly** (`s.gormClient.WithContext(ctx).Model(&X{})…`) and **owns
-> transactions directly** (`s.gormClient.WithContext(ctx).Transaction(func(tx *gorm.DB) error
-> { … })`). See **`docs/db-rules.md`** for the endorsed GORM patterns and the **reservations
-> service** (`services/alpha/modules/reservations/service/`) as the live reference template
-> (NOT the decommissioning `novella` service). The migration-*type* guidance below (GORM
-> tags, ULID prefixes, `BeforeCreate`, proto conversion, ID prefixes in `global.go`) **still
-> applies** — but **AutoMigrate registration moves out of `repo/init.go` into a
-> `func (s *ServiceImpl) doAutoMigrations(ctx context.Context) error` method in the service
-> package** (see `reservations/service/repo_init.go`). Read every "repo package" /
-> "`repo/init.go`" reference below as "the service layer's `service/repo_init.go` (package
-> service)". (Lesson: `.opencode/lessons/06-26-2026-inspirations-refactor-01.md`.)
+> **CANONICAL COPY: [`.claude/rules/data.md`](../../.claude/rules/data.md).** This file is the
+> `.opencode` mirror, kept in sync by hand. Agent, command, skill, and rule definitions for
+> Claude Code now live under `.claude/` — edit there first.
+
+# Database schema & persistence rules
+
+> ## 🚨 The headline rule (2026-08-01)
 >
-> **⚠️ ALSO (2026-06-27) — each service owns its domain types.** New/refactored services
-> **define and maintain their own entity types inside the service directory** (`package
-> service`, e.g. `models_*.go` mirroring the reservations service) and do **not** import
-> domain entity types from `libs/go/postgres/migrations`. The shared-migrations pattern in
-> this guide is the legacy approach services are migrating away from; do not add new domain
-> types to `libs/go/postgres/migrations` for a service that can own them. When localizing,
-> keep only the fields/methods the service uses and preserve any serialized (e.g.
-> Meilisearch JSONB) shape. (Lesson: `.opencode/lessons/06-27-2026-inspirations-refactor-02.md`.)
+> **Schema is created and changed by versioned goose SQL migrations under `data/migrations/{service}/`.**
+> **`gorm.AutoMigrate` is FROZEN LEGACY.** It still runs at boot for the services that have not
+> been migrated yet, but it is **not** the way you add a table or a column any more. Do not
+> extend it. Every new table, column, index, constraint, or backfill ships as a numbered
+> `.sql` migration with an `Up` **and** a `Down`.
+>
+> If a task tells you to "add the type and register it in `doAutoMigrations`", that instruction
+> is stale — write the migration instead, and say so.
 
-# PostgreSQL Table Creation Guide for Jouvae
+---
 
-This guide explains how to create tables in PostgreSQL using GORM for the Jouvae platform.
+## Contents
 
-## Overview
+1. [Why we left AutoMigrate](#1-why-we-left-automigrate)
+2. [Where things live](#2-where-things-live)
+3. [Writing a migration](#3-writing-a-migration)
+4. [Applying migrations](#4-applying-migrations)
+5. [Standing up migrations for a service that has none](#5-standing-up-migrations-for-a-service-that-has-none)
+6. [The GORM model beside the migration](#6-the-gorm-model-beside-the-migration)
+7. [Hook discipline (`BeforeCreate` and friends)](#7-hook-discipline-beforecreate-and-friends)
+8. [ID prefixes](#8-id-prefixes)
+9. [Tests must apply the migrations](#9-tests-must-apply-the-migrations)
+10. [Working on a table that is still AutoMigrated](#10-working-on-a-table-that-is-still-automigrated)
+11. [Common field patterns](#11-common-field-patterns)
+12. [Checklist](#12-checklist)
 
-Jouvae uses GORM's AutoMigrate feature to automatically create and update database tables. The process involves:
+---
 
-1. **Define the migration type** in `libs/go/postgres/migrations/`
-2. **Register the type** for auto-migration in the appropriate service's `repo/init.go`
+## 1. Why we left AutoMigrate
 
-## Step 1: Define Your Migration Type
+`AutoMigrate` reads the Go struct and mutates the live schema at service boot. That gives:
 
-### Location
+- **No history and no down path.** You cannot see what changed, when, or roll it back.
+- **Boot-time schema mutation.** Every replica racing to alter the same tables; under `air` a
+  save-triggered restart re-runs DDL against the dev DB.
+- **Silent no-ops.** AutoMigrate never drops a column, never narrows a type, never fixes a
+  constraint. The struct and the table drift apart and nothing tells you.
+- **Warn-and-continue.** The existing `doAutoMigrations` bodies swallow "already exists" errors,
+  so a genuinely broken migration can look fine.
+- **No data migrations.** Backfills, seeds, and renames have nowhere to live.
 
-Create or modify a file in `libs/go/postgres/migrations/`. Group types by domain (e.g., `identity.go`, `experiences.go`, `circles.go`).
+Versioned SQL fixes all five: ordered, reversible, reviewable, explicit, and **operator-invoked**.
 
-### Type Definition Structure
+**Current state of the migration (know which half you are in):**
+
+| Surface | Schema owner |
+|---|---|
+| `staging` schema (hermes) | **goose** — `data/migrations/hermes/` |
+| `listing_taxonomy` schema (reservations) | **goose** — `data/migrations/reservations/` |
+| Everything else (identity, content, circles, finance, calendar, inspirations, the rest of reservations) | **legacy `AutoMigrate`** — frozen, being paid down |
+
+---
+
+## 2. Where things live
+
+```
+data/migrations/{service}/NNNNN_short_name.sql   # the migrations (source of truth for schema)
+services/alpha/cmd/{service}-migrate/main.go     # the goose runner for that service
+Makefile: {service}-migrate / {service}-migrate-down
+services/alpha/modules/{service}/service/models_*.go   # the GORM model that MAPS to the table
+```
+
+Reference implementations — copy these, do not invent a new shape:
+
+- **Runner:** `services/alpha/cmd/reservations-migrate/main.go` (or `cmd/hermes-migrate`, the pilot).
+- **Migration:** `data/migrations/reservations/00005_listing_facet.sql`.
+- **Model:** `services/alpha/modules/reservations/service/models_listing_facet.go`.
+- **Test wiring:** `services/alpha/modules/reservations/tests/init_test.go` (`applyReservationsMigrations`).
+
+---
+
+## 3. Writing a migration
+
+File name: `NNNNN_snake_case_description.sql`, zero-padded, strictly increasing **within that
+service's directory**. Two services may reuse the same numbers — that is why each has its own
+goose version table (§4).
+
+```sql
+-- +goose Up
+-- listing_facet — the per-listing derived/asked facet projection (data/v1,
+-- listings-taxonomy.md rev-8 §6). Explain WHAT this table is and WHY it exists;
+-- the migration is the schema's documentation.
+CREATE TABLE listing_taxonomy.listing_facet (
+    id              TEXT PRIMARY KEY,                       -- prefixed ULID (lfp-)
+    listing_id      TEXT NOT NULL,
+    facet_key       TEXT NOT NULL,
+    facet_value_id  TEXT REFERENCES listing_taxonomy.facet_values(id),
+    value           TEXT,
+    source          TEXT NOT NULL DEFAULT 'derived'
+        CHECK (source IN ('asked','derived')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ON listing_taxonomy.listing_facet (listing_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS listing_taxonomy.listing_facet;
+```
+
+Rules:
+
+- **Every migration ships `-- +goose Up` AND `-- +goose Down`.** A `Down` that cannot restore
+  the data must still restore the *schema*, and must say so in a comment.
+- **The SQL is the source of truth for schema.** Types, `NOT NULL`, `DEFAULT`, `CHECK`, `UNIQUE`,
+  indexes, and foreign keys are declared **here**, not in Go struct tags.
+- **Comment the intent.** A migration is read years later by someone who has no context. Say what
+  the table is, which doc/section it implements, and any non-obvious storage decision.
+- **Never edit an applied migration.** Once a migration has been applied anywhere (including a
+  teammate's dev DB), it is immutable — write a new one.
+- **Own your schema.** A service migrates only its own tables. Cross-service references are
+  *logical* (a `TEXT` column holding the other service's ULID), not a foreign key across domains —
+  see the `listing_id` comment in the example above.
+- **Data migrations are migrations too.** Seeds, backfills, and renames get their own numbered
+  file (e.g. `00002_listing_taxonomy_seed.sql`).
+- Statements that goose cannot split (functions, `DO $$ … $$`) need
+  `-- +goose StatementBegin` / `-- +goose StatementEnd`.
+
+---
+
+## 4. Applying migrations
+
+```bash
+make reservations-migrate         # apply all pending
+make reservations-migrate-down    # roll back the most recent
+make hermes-migrate               # same, per service
+```
+
+Non-negotiable properties of the runner (already implemented — preserve them if you touch it):
+
+- **Discrete and operator-invoked.** Migrations are **never** a service-boot side-effect and
+  **never** an `air` watch target. A backend save must not run DDL.
+- **Postgres session advisory lock** held across the whole apply on a pinned `*sql.Conn`, so
+  concurrent appliers (multi-replica boot, CI) serialize instead of racing.
+- **Per-service goose version table** — `goose.SetTableName("goose_db_version_{service}")`.
+  The services share one dev database and their version numbers collide; without this, goose's
+  default table skews every service's state.
+- **Fail loud.** Any error is fatal with a non-zero exit. There is no warn-and-continue.
+
+---
+
+## 5. Standing up migrations for a service that has none
+
+When a service (or a new schema inside one) needs versioned migrations:
+
+1. `mkdir data/migrations/{service}` and write `00001_*.sql`.
+2. Copy `services/alpha/cmd/reservations-migrate/main.go` to `cmd/{service}-migrate/main.go`.
+   Change exactly three things: the **advisory-lock key** (a new, stable, never-reused constant —
+   e.g. ascii of the service abbreviation), the **default migrations dir**, and the
+   **goose table name** `goose_db_version_{service}`.
+3. Add `{service}-migrate` / `{service}-migrate-down` targets to the `Makefile` (and to `.PHONY`),
+   modelled on the reservations targets.
+4. Apply the same migrations in the service's `TestMain` (§9).
+5. Make sure the new tables are **not** registered in `doAutoMigrations`.
+
+---
+
+## 6. The GORM model beside the migration
+
+The Go struct still exists — it is the **read/write mapping**, not the schema definition.
 
 ```go
-package migrations
+package service
 
-import (
-    "time"
-    "github.com/jackc/pgtype"
-    "gorm.io/datatypes"
-    "gorm.io/gorm"
-)
+// ListingFacet maps 1:1 to listing_taxonomy.listing_facet, created by
+// data/migrations/reservations/00005_listing_facet.sql.
+//
+// NEVER registered with gorm.AutoMigrate — the table is applied ONLY via goose.
+type ListingFacet struct {
+	ID           string    `json:"id" gorm:"column:id;primaryKey"`
+	ListingID    string    `json:"listing_id" gorm:"column:listing_id"`
+	FacetKey     string    `json:"facet_key" gorm:"column:facet_key"`
+	FacetValueID string    `json:"facet_value_id" gorm:"column:facet_value_id"`
+	Value        string    `json:"value" gorm:"column:value"`
+	Source       string    `json:"source" gorm:"column:source"`
+	CreatedAt    time.Time `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt    time.Time `json:"updated_at" gorm:"column:updated_at"`
+}
 
-type YourType struct {
-    // Primary key - always use ULID format with a prefix
-    ID string `json:"id" gorm:"primaryKey"`
+// TableName pins the schema-qualified table name.
+func (ListingFacet) TableName() string { return "listing_taxonomy.listing_facet" }
+```
 
-    // Foreign keys - use proper GORM tags
-    RelatedID string `json:"related_id" gorm:"index"`
+Rules:
 
-    // Standard fields
-    Name        string    `json:"name" gorm:"not null"`
-    Description string    `json:"description"`
-    Status      string    `json:"status" gorm:"index;default:'active'"`
+- **The service owns its domain types** (2026-06-27 directive). Define them in the service
+  directory as `package service` (`models_*.go`). Do **not** add new domain types to
+  `libs/go/postgres/migrations` — that shared package is legacy and services are moving off it.
+- **`gorm:` tags on a goose-owned model are MAPPING ONLY.** Use `column:`, `primaryKey`, and
+  `TableName()`. Do **not** carry DDL tags — `not null`, `default:`, `index`, `uniqueIndex`,
+  `type:` — on a goose-owned model. They generate nothing (the model is never AutoMigrated) and
+  they lie about where the constraint lives. Declare it in the SQL.
+- **Never register a goose-owned model in `doAutoMigrations`.** Say so in the model's doc comment,
+  as the reference model does — it is the single easiest mistake to make.
+- `TableName()` is required for any table in a non-`public` schema.
+- Service layer uses `gormClient` **directly** and owns transactions directly
+  (`s.gormClient.WithContext(ctx).Transaction(func(tx *gorm.DB) error { … })`). There is **no**
+  `repo` package and **no** `Repository` interface in new or refactored services. Query patterns:
+  `docs/db-rules.md`; live template: `services/alpha/modules/reservations/service/`.
 
-    // JSONB fields for flexible data
-    Metadata datatypes.JSON `json:"metadata" gorm:"type:jsonb"`
+---
 
-    // Array fields (PostgreSQL text array)
-    Tags pq.StringArray `json:"tags" gorm:"type:text[]"`
+## 7. Hook discipline (`BeforeCreate` and friends)
 
-    // Timestamps
-    CreatedAt time.Time `json:"created_at" gorm:"index"`
-    UpdatedAt time.Time `json:"updated_at"`
-    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+GORM hooks are the most-abused escape hatch in this codebase. They run invisibly, outside the
+handler's Func Flow phases, and **are silently skipped** by `Session{SkipHooks: true}` bulk writes
+(`docs/db-rules.md` §10) — so anything load-bearing inside one is a latent data bug.
+
+**`BeforeCreate` may do exactly one thing: mint the prefixed ULID when the ID is unset.**
+
+```go
+// BeforeCreate assigns a prefixed ULID ("lfp-") when the id is unset.
+func (f *ListingFacet) BeforeCreate(_ *gorm.DB) (err error) {
+	if f.ID == "" {
+		f.ID, err = utils.NewULID(utils.ListingFacetPrefix)
+	}
+	return err
 }
 ```
 
-### Required GORM Tag Patterns
+Do **not**:
 
-| Pattern | Purpose | Example |
-|---------|---------|---------|
-| `gorm:"primaryKey"` | Primary key field | `ID string `gorm:"primaryKey"` |
-| `gorm:"index"` | Single column index | `Email string `gorm:"index"` |
-| `gorm:"uniqueIndex"` | Unique index | `Slug string `gorm:"uniqueIndex"` |
-| `gorm:"index:idx_name"` | Named index | `Name string `gorm:"index:idx_name"` |
-| `gorm:"not null"` | Not null constraint | `Name string `gorm:"not null"` |
-| `gorm:"default:'value'"` | Default value | `Status string `gorm:"default:'active'"` |
-| `gorm:"type:text[]"` | Text array (PostgreSQL) | `Tags pq.StringArray `gorm:"type:text[]"` |
-| `gorm:"type:jsonb"` | JSONB column | `Metadata datatypes.JSON `gorm:"type:jsonb"` |
-| `gorm:"foreignKey:Field"` | Foreign key | `Related []*Type `gorm:"foreignKey:TypeID"` |
-| `gorm:"-"` | Skip migration (not persisted) | `CalculatedField string `gorm:"-"` |
+- ❌ **Set `CreatedAt`/`UpdatedAt` in a hook.** The database owns timestamps — declare
+  `TIMESTAMPTZ NOT NULL DEFAULT now()` in the migration and let GORM's `autoCreateTime` /
+  `autoUpdateTime` handle the rest. `t.CreatedAt = time.Now()` in `BeforeCreate` writes the *app's*
+  clock over the DB default, skews under clock drift, and vanishes under `SkipHooks`. The legacy
+  `libs/go/postgres/migrations` types do this; do not copy them.
+- ❌ **Do I/O in a hook** — no other-table reads/writes, no RPCs, no cache or search-index updates.
+  They are untraced, they escape the handler's span tree, and they re-run per row on batch inserts.
+- ❌ **Put business logic, validation, or defaulting in a hook.** Validation and normalization belong
+  in Func Flow's *validate* phase; column defaults belong in the SQL `DEFAULT`.
+- ❌ **Use `AfterCreate` / `AfterUpdate` / `BeforeDelete` for domain side-effects** (emitting events,
+  granting permissions, projecting). Those are *command*-phase work and must run inside the same
+  transaction the aggregate write runs in, where they are visible and rollback-safe.
+  See `.opencode/rules/go-standard.md` Part II §1 (Func Flow).
 
-### BeforeCreate Hook
+If you find yourself wanting a hook for anything beyond ID minting, the logic belongs in the
+service method. Move it there.
 
-Every migration type should have a `BeforeCreate` hook to auto-generate the ID and set timestamps:
+---
 
-```go
-func (t *YourType) BeforeCreate(tx *gorm.DB) error {
-    if t.ID == "" {
-        var err error
-        t.ID, err = newULID(YourTypePrefix)
-        if err != nil {
-            return err
-        }
-    }
-    t.CreatedAt = time.Now()
-    return nil
-}
-```
+## 8. ID prefixes
 
-### Using Existing Migration Types
+Primary keys are **prefixed ULIDs** stored as `TEXT`. Three lowercase characters, then the ULID.
 
-Before creating a new type, check `libs/go/postgres/migrations/` for existing types. Common reusable types include:
+- Service-owned models use `utils.NewULID(utils.XxxPrefix)` — constants in
+  **`libs/go/utils/random.go`**. This is the one to use.
+- The legacy shared types use `migrations.NewULID` with prefixes in
+  `libs/go/postgres/migrations/global.go`. Do not add new prefixes there.
+- Prefixes are **globally unique** across the platform. Grep before adding one.
+- A non-ULID id in the database (e.g. `ins-000f6a70…` instead of `ins-01KW…`) is a **tell** that
+  something bypassed the entity's RPC to seed data. Treat it as a bug, not as usable data.
 
-- `Location` - geographic location data
-- `Guest` - guest/user entity
-- `File` - file upload metadata
-- `AuthzRelation` - authorization relationships
-- `Invitation` - invitation records
+---
 
-### Proto Conversion Methods (Optional but Recommended)
+## 9. Tests must apply the migrations
 
-If your type corresponds to a protobuf message, implement conversion methods:
+Goose-owned tables do not exist in a test container just because the service booted — the service
+no longer creates them. The test package must apply them itself, after the DB is up and before the
+suite runs.
+
+Follow `services/alpha/modules/reservations/tests/init_test.go`:
 
 ```go
-func YourTypeFromProto(pb *global.YourType) *YourType {
-    if pb == nil {
-        return nil
-    }
-
-    // Marshal metadata to JSON if needed
-    var metadataJSON json.RawMessage
-    if len(pb.Metadata) > 0 {
-        if data, err := json.Marshal(pb.Metadata); err == nil {
-            metadataJSON = data
-        }
-    }
-
-    return &YourType{
-        ID:          pb.Id,
-        Name:        pb.Name,
-        Description: pb.Description,
-        Status:      pb.Status.String(),
-        Metadata:    metadataJSON,
-        CreatedAt:   time.UnixMilli(pb.CreatedAt),
-        UpdatedAt:   time.UnixMilli(pb.UpdatedAt),
-    }
-}
-
-func (t *YourType) ToProto() *global.YourType {
-    if t == nil {
-        return nil
-    }
-
-    // Unmarshal metadata from JSON if needed
-    var metadata map[string]string
-    if len(t.Metadata) > 0 {
-        json.Unmarshal(t.Metadata, &metadata)
-    }
-
-    return &global.YourType{
-        Id:          t.ID,
-        Name:        t.Name,
-        Description: t.Description,
-        Status:      global.YourTypeStatus(global.YourTypeStatus_value[t.Status]),
-        Metadata:    metadata,
-        CreatedAt:   t.CreatedAt.UnixMilli(),
-        UpdatedAt:   t.UpdatedAt.UnixMilli(),
-    }
-}
+// in TestMain, after StartTestContainers + GetDbClientConnections
+if err := applyReservationsMigrations(ctx, dbConns); err != nil { … }
 ```
 
-## Step 2: Register for Auto-Migration
-
-### Location
-
-Find the appropriate service directory: `services/alpha/modules/{service-name}/repo/init.go`
-
-Services:
-- `identity` - guest, workspace, auth data
-- `experiences` - experiences, reservations, resources
-- `finance` - payments, invoices
-- `circles` - messaging, conversations, journeys
-- `content` - file uploads, CDN
-
-### Add to doAutoMigrations Function
-
-Add your type to the `doAutoMigrations` function in the service's `repo/init.go`:
-
-```go
-func (r *repoImpl) doAutoMigrations(ctx context.Context) (err error) {
-    _, span := r.tracer.StartWithInfo(ctx)
-    defer span.End()
-
-    if r.db == nil {
-        return errors.New("the postgres connection was not initialized")
-    }
-
-    // Add your migration here
-    if err = r.db.AutoMigrate(&migrations.YourType{}); err != nil {
-        if utils.ErrorAlreadyExists(err) {
-            r.logger.Warn().Msg("your_types table already exists")
-        } else {
-            return fmt.Errorf("failed to migrate YourType table: %v", err)
-        }
-    }
-
-    // Existing migrations...
-    if err = r.db.AutoMigrate(&migrations.Reservation{}); err != nil {
-        // ...
-    }
-
-    return nil
-}
-```
-
-### Error Handling Pattern
-
-Use the standard error handling pattern:
-
-```go
-if err = r.db.AutoMigrate(&migrations.YourType{}); err != nil {
-    if utils.ErrorAlreadyExists(err) {
-        r.logger.Warn().Msg("your_types table already exists")
-    } else {
-        return fmt.Errorf("failed to migrate YourType table: %v", err)
-    }
-}
-```
-
-## ID Prefix Conventions
-
-Add your type's prefix to `libs/go/postgres/migrations/global.go`:
-
-```go
-type Prefix string
-
-const (
-    // Existing prefixes...
-    YourTypePrefix Prefix = "yrt"
-)
-```
-
-Use descriptive prefixes (typically 3 letters):
-- `exp` - Experience
-- `rsv` - Reservation
-- `gst` - Guest
-- `wks` - Workspace
-- `msg` - Message
-
-## Common Field Patterns
-
-### Soft Deletes
-
-```go
-DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
-```
-
-### Composite Indexes
-
-```go
-// For query performance on multiple fields
-Status     string `gorm:"index:idx_status_owner,priority:1;default:'active'"`
-OwnerID    string `gorm:"index:idx_status_owner,priority:2"`
-RetryCount int    `gorm:"index:idx_status_retry,priority:2;default:0"`
-```
-
-### Foreign Keys
-
-```go
-// Explicit foreign key
-RelatedID string `json:"related_id" gorm:"index;not null"`
-
-// Or define relationship
-Related []RelatedType `json:"related" gorm:"foreignKey:YourTypeID"`
-```
-
-### Time Bounds
-
-```go
-StartTime time.Time `json:"start_time"`
-EndTime   time.Time `json:"end_time"`
-ExpiresAt time.Time `json:"expires_at" gorm:"index"`
-```
-
-### Idempotency
-
-```go
-IdempotencyKey string `json:"idempotency_key" gorm:"uniqueIndex:idx_idempotency"`
-```
-
-## Complex Data Types
-
-### JSONB (Flexible Schema)
-
-```go
-import "gorm.io/datatypes"
-
-Metadata datatypes.JSON `json:"metadata" gorm:"type:jsonb"`
-```
-
-### Text Arrays (PostgreSQL)
-
-```go
-import "github.com/lib/pq"
-
-Tags pq.StringArray `json:"tags" gorm:"type:text[]"`
-Emails pq.StringArray `json:"emails" gorm:"type:text[]"`
-```
-
-### Geographic Data (Point)
-
-```go
-import "github.com/jackc/pgtype"
-
-type Geo struct {
-    pgtype.Point
-    Latitude  float64 `json:"lat"`
-    Longitude float64 `json:"lng"`
-}
-
-type YourType struct {
-    Geo *Geo `json:"_geo"`
-}
-```
-
-## Testing Your Migration
-
-1. Start the development environment:
-   ```bash
-   make up
-   ```
-
-2. Build and run the service:
-   ```bash
-   make build
-   ```
-
-3. Verify the table was created in PostgreSQL:
-   ```bash
-   psql -h localhost -U jouvae -d jouvae -c "\dt your_types"
-   ```
-
-4. Check the schema:
-   ```bash
-   psql -h localhost -U jouvae -d jouvae -c "\d your_types"
-   ```
-
-## Troubleshooting
-
-### Migration Already Exists
-
-If you see "table already exists" warnings, this is normal. GORM handles this gracefully.
-
-### Foreign Key Issues
-
-Ensure foreign key fields match the referenced table's primary key type and name.
-
-### Index Not Creating
-
-Check that index names are unique across the entire database, not just the table.
-
-### Type Conversion Errors
-
-When converting from proto, handle nil pointers and optional fields:
-```go
-if pb.OptionalField != nil {
-    y.OptionalField = pb.OptionalField.Value
-}
-```
-
-## Best Practices
-
-1. **Use ULIDs with prefixes** for all IDs - defined in `global.go`
-2. **Always include timestamps** (`CreatedAt`, `UpdatedAt`, `DeletedAt`)
-3. **Use JSONB for flexible metadata** rather than adding many optional columns
-4. **Add indexes to foreign keys** and frequently queried fields
-5. **Set sensible defaults** for status fields and counters
-6. **Handle errors gracefully** in `BeforeCreate` hooks
-7. **Implement proto conversion** if the type has a protobuf definition
-8. **Check for existing types** before creating new ones
-9. **Group related fields** in the same migration file
-10. **Use descriptive prefixes** (3 characters) for readability
-
-## Complete Example
-
-```go
-package migrations
-
-import (
-    "encoding/json"
-    "time"
-    "github.com/jouvae/core/apis/pb/go/global"
-    "gorm.io/datatypes"
-    "gorm.io/gorm"
-)
-
-type Event struct {
-    ID          string         `json:"id" gorm:"primaryKey"`
-    Name        string         `json:"name" gorm:"not null"`
-    Description string         `json:"description"`
-    Status      string         `json:"status" gorm:"index;default:'draft'"`
-    OwnerID     string         `json:"owner_id" gorm:"index:idx_event_owner"`
-
-    LocationID  string         `json:"location_id" gorm:"index"`
-    StartDate   time.Time      `json:"start_date" gorm:"index"`
-    EndDate     time.Time      `json:"end_date"`
-    MaxAttendees int           `json:"max_attendees" gorm:"default:100"`
-
-    Metadata datatypes.JSON `json:"metadata" gorm:"type:jsonb"`
-
-    CreatedAt time.Time      `json:"created_at"`
-    UpdatedAt time.Time      `json:"updated_at"`
-    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
-}
-
-func (e *Event) BeforeCreate(tx *gorm.DB) error {
-    if e.ID == "" {
-        var err error
-        e.ID, err = newULID(EventPrefix)
-        if err != nil {
-            return err
-        }
-    }
-    e.CreatedAt = time.Now()
-    return nil
-}
-
-func EventFromProto(pb *global.Event) *Event {
-    if pb == nil {
-        return nil
-    }
-
-    var metadataJSON json.RawMessage
-    if len(pb.Metadata) > 0 {
-        json.Marshal(pb.Metadata)
-    }
-
-    return &Event{
-        ID:          pb.Id,
-        Name:        pb.Name,
-        Description: pb.Description,
-        Status:      pb.Status.String(),
-        OwnerID:     pb.OwnerId,
-        LocationID:  pb.LocationId,
-        StartDate:   time.UnixMilli(pb.StartDate),
-        EndDate:     time.UnixMilli(pb.EndDate),
-        MaxAttendees: int(pb.MaxAttendees),
-        Metadata:    metadataJSON,
-        CreatedAt:   time.UnixMilli(pb.CreatedAt),
-        UpdatedAt:   time.UnixMilli(pb.UpdatedAt),
-    }
-}
-
-func (e *Event) ToProto() *global.Event {
-    if e == nil {
-        return nil
-    }
-
-    var metadata map[string]string
-    json.Unmarshal(e.Metadata, &metadata)
-
-    return &global.Event{
-        Id:          e.ID,
-        Name:        e.Name,
-        Description: e.Description,
-        Status:      global.EventStatus(global.EventStatus_value[e.Status]),
-        OwnerId:     e.OwnerID,
-        LocationId:  e.LocationID,
-        StartDate:   e.StartDate.UnixMilli(),
-        EndDate:     e.EndDate.UnixMilli(),
-        MaxAttendees: int32(e.MaxAttendees),
-        Metadata:    metadata,
-        CreatedAt:   e.CreatedAt.UnixMilli(),
-        UpdatedAt:   e.UpdatedAt.UnixMilli(),
-    }
-}
-```
-
-Then register it in your service's `repo/init.go`:
-
-```go
-func (r *repoImpl) doAutoMigrations(ctx context.Context) (err error) {
-    // ... existing migrations ...
-
-    if err = r.db.AutoMigrate(&migrations.Event{}); err != nil {
-        if utils.ErrorAlreadyExists(err) {
-            r.logger.Warn().Msg("events table already exists")
-        } else {
-            return fmt.Errorf("failed to migrate Events table: %v", err)
-        }
-    }
-
-    return nil
-}
-```
-
-Don't forget to add the prefix to `global.go`:
-
-```go
-const (
-    // ...
-    EventPrefix Prefix = "evt"
-)
-```
+`applyReservationsMigrations` gets the `*sql.DB` off the GORM client, calls
+`goose.SetDialect("postgres")`, `goose.SetTableName("goose_db_version_reservations")`, and
+`goose.RunContext(ctx, "up", sqlDB, dir)` — then **verifies the schema actually exists** before
+returning. A multi-service harness that applies more than one service's migrations must set and
+**restore** the goose table name around each apply (see `hermes/tests/init_test.go`).
+
+---
+
+## 10. Working on a table that is still AutoMigrated
+
+Most tables still boot through `doAutoMigrations`. When a slice needs to change one:
+
+1. **Preferred:** move that table onto goose as part of the slice — write
+   `data/migrations/{service}/NNNNN_*.sql` describing the table *as it should be*, remove it from
+   `doAutoMigrations`, wire it into `TestMain`, and note the move in the migration's comment.
+2. **If the table is too entangled to move in this slice:** make the minimal struct change, and
+   **flag it explicitly** in your report as migration debt with the table name — do not let it pass
+   silently. Adding a field to an AutoMigrated struct is the one remaining case where a struct
+   change alters schema, and it must be a conscious, called-out exception.
+
+Never introduce a *new* table into `doAutoMigrations`.
+
+---
+
+## 11. Common field patterns
+
+| Need | SQL (the migration) | Go (the model) |
+|---|---|---|
+| Primary key | `id TEXT PRIMARY KEY` | `ID string \`gorm:"column:id;primaryKey"\`` |
+| Cross-service ref | `owner_id TEXT NOT NULL` + `CREATE INDEX` | `OwnerID string \`gorm:"column:owner_id"\`` |
+| Enum-ish status | `status TEXT NOT NULL DEFAULT 'active' CHECK (status IN (…))` | `Status string \`gorm:"column:status"\`` |
+| Flexible metadata | `metadata JSONB` | `Metadata datatypes.JSON \`gorm:"column:metadata"\`` |
+| String array | `tags TEXT[]` | `Tags pq.StringArray \`gorm:"column:tags"\`` |
+| Timestamps | `created_at/updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` | `time.Time` fields — **no hook** |
+| Soft delete | `deleted_at TIMESTAMPTZ` + `CREATE INDEX` | `DeletedAt gorm.DeletedAt \`gorm:"column:deleted_at"\`` |
+| Idempotency | `idempotency_key TEXT` + `CREATE UNIQUE INDEX` | plain `string` field |
+| Composite index | `CREATE INDEX ON t (status, owner_id)` | *(nothing — SQL owns it)* |
+
+Idempotency is enforced by a **Postgres unique constraint**, never by Redis or in-process
+dedup (`.opencode/rules/go-standard.md` Part I §6).
+
+### Proto conversion
+
+If the type has a protobuf counterpart, keep `XxxFromProto` / `(*Xxx).ToProto` next to the model.
+Conversion happens at the transport boundary only — internal functions pass domain types, never
+proto messages (`.opencode/rules/go-standard.md` Part II §8).
+
+---
+
+## 12. Checklist
+
+Before you call a schema change done:
+
+- [ ] The change is a numbered `.sql` file under `data/migrations/{service}/`.
+- [ ] It has both `-- +goose Up` and `-- +goose Down`.
+- [ ] It carries a comment saying what the table/column is and which doc it implements.
+- [ ] `make {service}-migrate` applies cleanly, and `…-migrate-down` rolls back cleanly.
+- [ ] No applied migration was edited.
+- [ ] The Go model lives in the service package, has `TableName()`, and carries **no DDL tags**.
+- [ ] The model is **not** in `doAutoMigrations`.
+- [ ] `BeforeCreate` mints the ULID and does nothing else; no timestamps, no I/O, no logic.
+- [ ] The ID prefix is registered in `libs/go/utils/random.go` and is unique.
+- [ ] `TestMain` applies the service's migrations and verifies the schema exists.
+- [ ] Any table you had to leave on `AutoMigrate` is called out as migration debt.

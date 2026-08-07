@@ -1,0 +1,17 @@
+{
+  "//": "3D flow — active hook wiring. model-lock blocks edits to a LOCKED model/IA artifact.",
+  "//2": "Lock source of truth is Supabase models.locked_globs (set in the Design phase); the hook",
+  "//3": "reads it via REST using SUPABASE_URL + SUPABASE_SERVICE_KEY from gitignored",
+  "//4": "settings.local.json, and is a SAFE NO-OP when those are unset. Metrics/lessons are written",
+  "//5": "by the metrics-writer / supabase-artifact SUBAGENTS via the Supabase MCP (decision b).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/model-lock.sh" }
+        ]
+      }
+    ]
+  }
+}
