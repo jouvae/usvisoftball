@@ -10,6 +10,7 @@
     "seed": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-articles.ts",
     "seed:admin": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-admin.ts",
     "seed:contributor": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-contributor.ts",
+    "seed:about": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-about.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

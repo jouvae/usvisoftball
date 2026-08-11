@@ -73,8 +73,11 @@ CREATE TABLE IF NOT EXISTS information_arch (
 CREATE TABLE IF NOT EXISTS models (
   id             TEXT PRIMARY KEY DEFAULT ('mdl_' || lower(hex(randomblob(8)))),
   feature_id     TEXT NOT NULL REFERENCES features(id) ON DELETE CASCADE,
-  content        TEXT,                              -- JSON
-  locked         INTEGER NOT NULL DEFAULT 0,        -- boolean 0/1
+  content        TEXT,                              -- JSON (the Model+IA)
+  ia_ref         TEXT,                              -- -> information_arch.id
+  locked         INTEGER NOT NULL DEFAULT 0,        -- boolean 0/1 (model-lock gate)
+  locked_at      TEXT,
+  locked_globs   TEXT,                              -- JSON array of repo-relative path globs
   approval_token TEXT,
   created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at     TEXT DEFAULT CURRENT_TIMESTAMP

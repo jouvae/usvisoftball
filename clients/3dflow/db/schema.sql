@@ -62,7 +62,9 @@ create table if not exists information_arch (
 create table if not exists models (
   id text primary key default ('mdl_' || encode(gen_random_bytes(8),'hex')),
   feature_id text not null references features(id) on delete cascade,
-  content jsonb, locked boolean not null default false, approval_token text,
+  content jsonb, ia_ref text,
+  locked boolean not null default false, locked_at timestamptz, locked_globs text[],
+  approval_token text,
   created_at timestamptz default now(), updated_at timestamptz default now()
 );
 
