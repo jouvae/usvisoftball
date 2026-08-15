@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getMission, listCurrentBoard, listArchivedTerms } from "@/lib/board";
+import { getContactInfo } from "@/lib/contact";
 import { BoardRoster } from "@/components/ui/board-roster";
+import { ContactSection } from "@/components/ui/contact-section";
 
 // DELIVER (Node 1): renders from the REAL Supabase reads via lib/board (RLS-enforced
 // publishable client). Empty-state branches are now real paths (no mission → omit;
@@ -10,10 +12,11 @@ import { BoardRoster } from "@/components/ui/board-roster";
 export const dynamic = "force-dynamic";
 
 export default async function AboutPage() {
-  const [mission, currentBoard, archivedTerms] = await Promise.all([
+  const [mission, currentBoard, archivedTerms, contact] = await Promise.all([
     getMission(),
     listCurrentBoard(),
     listArchivedTerms(),
+    getContactInfo(),
   ]);
 
   // Roster already ordered (sort_order, name) by the read contract.
@@ -60,6 +63,8 @@ export default async function AboutPage() {
           </ul>
         </section>
       ) : null}
+
+      {contact ? <ContactSection contact={contact} /> : null}
     </section>
   );
 }

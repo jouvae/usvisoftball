@@ -77,6 +77,17 @@ export default async function AdminDashboardPage() {
               Board admin
             </Link>
           ) : null}
+          {/* The contact editor (about-e2e-010) is editor-only — same canReview gate;
+              updateContactAction re-runs requireRole('editor') and RLS re-enforces. */}
+          {canReview ? (
+            <Link
+              data-testid="admin-contact-link"
+              href="/admin/contact"
+              className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+            >
+              Contact info
+            </Link>
+          ) : null}
           {/* The AI draft panel is for contributor OR editor (slice-09 §5.1), and
               only when the NEXT_PUBLIC_AI_DRAFT_ENABLED flag is on — prod hides it. */}
           {AI_DRAFT_ENABLED && (canAuthor || canReview) ? (
