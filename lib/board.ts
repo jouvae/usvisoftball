@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isBoardPhotoStorageUrl } from "@/lib/board-photos";
 import {
   type BoardSeat,
   type BoardTerm,
@@ -345,13 +346,30 @@ export async function createBoardMember(
   return toMember(data as BoardMemberRow);
 }
 
+// Read one member's current photo_url (or null) — used by the edit action to delete the
+// PRIOR uploaded object when a photo is replaced or cleared, so Storage doesn't accumulate
+// orphans. Reads through whatever client the caller passes (the editor session client).
+export async function getBoardMemberPhotoUrl(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("board_members")
+    .select("photo_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { photo_url: string | null } | null)?.photo_url ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // photo_url write-boundary guard (red-team SSRF item).
 //
 // A board photo is rendered by next/image on the public /about page. next.config.ts
-// configures NO `remotePatterns`, so next/image can only render LOCAL /public paths —
-// a remote host would 500 at render even if it reached the DB. We therefore reject, at
-// the WRITE boundary, any photo_url that is neither a local path nor an ALLOWLISTED
+// allows ONLY the Supabase Storage board-photos public path (0009) as a remote source, so
+// a stored upload URL renders; any OTHER remote host would 500 at render even if it
+// reached the DB. We therefore reject, at the WRITE boundary, any photo_url that is
+// neither a local path, nor one of our uploaded board-photo URLs, nor an ALLOWLISTED
 // host, so an editor cannot persist an arbitrary off-site (SSRF-shaped) URL.
 // ---------------------------------------------------------------------------
 
@@ -380,6 +398,7 @@ export function assertBoardPhotoUrlAllowed(
 ): void {
   if (photoUrl == null || photoUrl === "") return; // missing-photo state
   if (photoUrl.startsWith("/") && !photoUrl.startsWith("//")) return; // local path
+  if (isBoardPhotoStorageUrl(photoUrl)) return; // an uploaded board photo (0009 bucket)
   let host: string;
   try {
     host = new URL(photoUrl).host;

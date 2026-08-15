@@ -37,6 +37,11 @@ export function BoardMemberForm({
 
   const seatKeys = Object.keys(SEAT_LABELS) as (keyof typeof SEAT_LABELS)[];
 
+  // Only a LOCAL /public path prefills the text box; an uploaded Storage URL (http…) is
+  // preserved via the hidden currentPhotoUrl + shown as a preview, not dumped as raw text.
+  const currentPhoto = member?.photoUrl ?? "";
+  const localPathValue = currentPhoto.startsWith("/") ? currentPhoto : "";
+
   return (
     <form
       action={formAction}
@@ -83,13 +88,48 @@ export function BoardMemberForm({
         />
       </label>
 
+      {/* Photo. Precedence (server-side): a chosen file → upload; else remove-toggle →
+          clear; else the local path text; else the member's CURRENT photo is preserved
+          server-side (read authoritatively, not from any client field). */}
+      {currentPhoto ? (
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentPhoto}
+            alt=""
+            data-testid="member-photo-current"
+            className="h-16 w-16 rounded-md border border-border object-cover"
+          />
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              name="removePhoto"
+              value="1"
+              data-testid="member-photo-remove"
+            />
+            Remove photo
+          </label>
+        </div>
+      ) : null}
+
       <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-        Photo path
+        Photo — upload an image (JPEG, PNG, or WebP, max 2 MB)
+        <input
+          type="file"
+          name="photoFile"
+          accept="image/jpeg,image/png,image/webp"
+          data-testid="member-photo-file"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        …or a local image path
         <input
           type="text"
           name="photoUrl"
           placeholder="/seed/member.png"
-          defaultValue={member?.photoUrl ?? ""}
+          defaultValue={localPathValue}
           data-testid="member-photo"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />

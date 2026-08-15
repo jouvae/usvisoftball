@@ -9,11 +9,19 @@ import {
   updateBoardMember,
   deleteBoardMember,
   rollBoardTerm,
+  getBoardMemberPhotoUrl,
   BoardPhotoUrlError,
   SEAT_LABELS,
   type BoardSeat,
   type UpdateBoardMemberFields,
 } from "@/lib/board";
+import {
+  uploadBoardPhoto,
+  deleteBoardPhotoByUrl,
+  isBoardPhotoStorageUrl,
+  BoardPhotoUploadError,
+} from "@/lib/board-photos";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
 // Feature softball/about — Slice 2 admin CRUD Server Actions (about-e2e-004..006).
@@ -43,6 +51,30 @@ function isValidSeat(value: string): value is BoardSeat {
 
 function pgErrorCode(err: unknown): string | undefined {
   return (err as { code?: string }).code;
+}
+
+// Resolve the photo for a create/edit submit, in precedence order:
+//   1. a chosen FILE  → validate + upload to Supabase Storage via the editor SESSION
+//      client (RLS) and return its public URL (throws BoardPhotoUploadError on a bad file);
+//   2. the `removePhoto` toggle → null (explicit clear);
+//   3. a `photoUrl` text value → that (a local /seed path);
+//   4. `preserveUrl` → the existing photo on a bare edit (add mode passes null).
+// `preserveUrl` is the AUTHORITATIVE server-read value (getBoardMemberPhotoUrl), never a
+// client field — so a forged input can't repoint one member at another's object (red-team
+// Low). `File` is a Node 20+ global; a file input with no selection posts a 0-byte entry.
+async function resolvePhotoFromForm(
+  formData: FormData,
+  supabase: SupabaseClient,
+  preserveUrl: string | null = null,
+): Promise<string | null> {
+  const file = formData.get("photoFile");
+  if (file instanceof File && file.size > 0) {
+    return await uploadBoardPhoto(file, supabase);
+  }
+  if (formData.get("removePhoto")) return null;
+  const text = String(formData.get("photoUrl") ?? "").trim();
+  if (text) return text;
+  return preserveUrl;
 }
 
 // updateMissionAction (about-e2e-004): edit the mission prose in place.
@@ -85,7 +117,6 @@ export async function createBoardMemberAction(
   const name = String(formData.get("name") ?? "").trim();
   const seat = String(formData.get("seat") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim();
-  const photoUrl = String(formData.get("photoUrl") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
   const sortOrderRaw = String(formData.get("sortOrder") ?? "").trim();
 
@@ -101,17 +132,16 @@ export async function createBoardMemberAction(
   }
 
   const supabase = await createSupabaseServerClient();
+  let photoUrl: string | null;
+  try {
+    photoUrl = await resolvePhotoFromForm(formData, supabase);
+  } catch (err) {
+    if (err instanceof BoardPhotoUploadError) return { error: err.message };
+    throw err;
+  }
   try {
     await createBoardMember(
-      {
-        termId,
-        name,
-        seat,
-        role,
-        photoUrl: photoUrl || null,
-        bio,
-        sortOrder,
-      },
+      { termId, name, seat, role, photoUrl, bio, sortOrder },
       supabase,
     );
   } catch (err) {
@@ -119,8 +149,11 @@ export async function createBoardMemberAction(
       return { error: err.message };
     }
     if (pgErrorCode(err) === "PGRST116" || pgErrorCode(err) === "23505") {
+      // The member write failed after the photo uploaded — clean up the orphan.
+      await deleteBoardPhotoByUrl(photoUrl, supabase);
       return { error: "Could not add this member. Please try again." };
     }
+    await deleteBoardPhotoByUrl(photoUrl, supabase);
     throw err;
   }
 
@@ -141,7 +174,6 @@ export async function updateBoardMemberAction(
   const name = String(formData.get("name") ?? "").trim();
   const seat = String(formData.get("seat") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim();
-  const photoUrl = String(formData.get("photoUrl") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
   const sortOrderRaw = String(formData.get("sortOrder") ?? "").trim();
 
@@ -156,16 +188,31 @@ export async function updateBoardMemberAction(
     return { error: "Sort order must be a number." };
   }
 
+  const supabase = await createSupabaseServerClient();
+  // The prior photo (if any) — to delete its Storage object when it's replaced/cleared.
+  let oldPhoto: string | null = null;
+  try {
+    oldPhoto = await getBoardMemberPhotoUrl(id, supabase);
+  } catch {
+    // non-fatal; skip orphan cleanup if we can't read the prior value
+  }
+  let nextPhoto: string | null;
+  try {
+    nextPhoto = await resolvePhotoFromForm(formData, supabase, oldPhoto);
+  } catch (err) {
+    if (err instanceof BoardPhotoUploadError) return { error: err.message };
+    throw err;
+  }
+
   const fields: UpdateBoardMemberFields = {
     name,
     seat,
     role,
-    photoUrl: photoUrl || null,
+    photoUrl: nextPhoto,
     bio,
     sortOrder,
   };
 
-  const supabase = await createSupabaseServerClient();
   try {
     await updateBoardMember(id, fields, supabase);
   } catch (err) {
@@ -173,9 +220,19 @@ export async function updateBoardMemberAction(
       return { error: err.message };
     }
     if (pgErrorCode(err) === "PGRST116") {
+      // 0 rows updated (non-editor / archived-term guard) — the write didn't happen, so
+      // the OLD photo is still in use; only clean up a freshly-uploaded orphan.
+      if (isBoardPhotoStorageUrl(nextPhoto) && nextPhoto !== oldPhoto) {
+        await deleteBoardPhotoByUrl(nextPhoto, supabase);
+      }
       return { error: "Could not save this member. Please try again." };
     }
     throw err;
+  }
+
+  // Success: if the photo changed, delete the prior uploaded object (best effort).
+  if (oldPhoto && oldPhoto !== nextPhoto) {
+    await deleteBoardPhotoByUrl(oldPhoto, supabase);
   }
 
   revalidatePath("/about");
