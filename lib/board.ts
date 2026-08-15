@@ -2,6 +2,30 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  type BoardSeat,
+  type BoardTerm,
+  type BoardMember,
+  type Mission,
+  type BoardRoster,
+  SEAT_LABELS,
+  ABOUT_MISSION_SLUG,
+} from "@/lib/board-view";
+
+// Re-export the client-safe view types + constants so existing server callers keep
+// importing them from "@/lib/board" unchanged. The canonical declarations now live in
+// lib/board-view.ts (no server-only) so Client Components can import them too — see the
+// header there for why. (Fixes a `next build` failure: board-member-form.tsx imported
+// SEAT_LABELS from here and dragged `server-only` into the browser bundle.)
+export {
+  type BoardSeat,
+  type BoardTerm,
+  type BoardMember,
+  type Mission,
+  type BoardRoster,
+  SEAT_LABELS,
+  ABOUT_MISSION_SLUG,
+};
 
 // ---------------------------------------------------------------------------
 // Feature softball/about — Model + data access (Node 1 contract).
@@ -16,73 +40,34 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // cross the boundary as ISO strings, never `Date` (serialization + determinism).
 // ---------------------------------------------------------------------------
 
-// H4: the geographic constituency (island seat). Union mirrors the migration CHECK
-// (`seat in ('st_thomas_st_john','st_croix','at_large')`) — keep the two in lockstep.
-export type BoardSeat = "st_thomas_st_john" | "st_croix" | "at_large";
-
-// Canonical, human-facing seat labels. about-web-002 asserts island COVERAGE (St.
-// Thomas/St. John · St. Croix · at-large all render); this is the single source of
-// truth for those strings so the roster component and the test never drift.
-export const SEAT_LABELS: Record<BoardSeat, string> = {
-  st_thomas_st_john: "St. Thomas / St. John",
-  st_croix: "St. Croix",
-  at_large: "At-Large",
-};
-
-// A per-term aggregate. `isCurrent` selects the live roster; archived terms
-// (isCurrent=false) are the read-only prior-term archive (about-web-003).
-export interface BoardTerm {
-  id: string;
-  slug: string; // URL-safe key ('2025-2027') for /about/[term]
-  label: string; // display label ('2025–2027', en-dash)
-  isCurrent: boolean;
-  sortOrder: number;
-  createdAt: string; // ISO 8601 (UTC)
-  updatedAt: string; // ISO 8601 (UTC)
-}
-
-// A roster row, child of a BoardTerm.
-export interface BoardMember {
-  id: string;
-  termId: string;
-  name: string;
-  seat: BoardSeat;
-  role: string;
-  photoUrl: string | null; // null → the missing-photo state (DESIGN.md empty states)
-  bio: string;
-  sortOrder: number;
-  createdAt: string; // ISO 8601 (UTC)
-  updatedAt: string; // ISO 8601 (UTC)
-}
-
-// The H1 singleton: one keyed block of site prose. Slice 1 reads slug='about_mission'.
-export interface Mission {
-  slug: string;
-  title: string | null;
-  body: string;
-  updatedAt: string; // ISO 8601 (UTC)
-}
-
-// A term paired with its ordered roster — the shape both the current-board read and
-// the archive-detail read return, so a screen always has term + members together.
-export interface BoardRoster {
-  term: BoardTerm;
-  members: BoardMember[];
-}
-
-// The canonical slug for the mission singleton. The ONLY site_content key this slice
-// reads or writes.
-export const ABOUT_MISSION_SLUG = "about_mission";
-
 // ---------------------------------------------------------------------------
-// Write shapes (seed path; admin CRUD DEFERRED). One shape per write, matching the
-// CreateArticleInput discipline.
+// Write shapes. Seed shapes (upsert*/create*) + admin-CRUD shapes (update*/roll*).
+// One shape per write, matching the CreateArticleInput discipline.
 // ---------------------------------------------------------------------------
 
 export interface UpsertMissionInput {
   slug?: string; // defaults to ABOUT_MISSION_SLUG
   title?: string | null;
   body: string;
+}
+
+// The editable columns of a board member, all OPTIONAL — the admin roster editor
+// PATCHes only the fields the form changed. `photoUrl: null` clears the photo (the
+// missing-photo state); an OMITTED key leaves the column untouched.
+export interface UpdateBoardMemberFields {
+  name?: string;
+  seat?: BoardSeat;
+  role?: string;
+  photoUrl?: string | null;
+  bio?: string;
+  sortOrder?: number;
+}
+
+// The rollover payload (about-e2e-006): only the new term's identity. The old current
+// term is discovered inside rollBoardTerm and archived — the caller never names it.
+export interface RollBoardTermInput {
+  newSlug: string;
+  newLabel: string;
 }
 
 export interface UpsertBoardTermInput {
@@ -327,10 +312,21 @@ export async function upsertBoardTerm(
 // Insert one board member. Pure insert — the (term_id, name) unique constraint makes a
 // re-run's duplicate raise PostgrestError code '23505', which the seed catches as
 // "already present" (the articles-seed idempotency pattern).
+//
+// The client is REQUIRED (no admin default) — this function is DUAL-USE: the seed passes
+// the BYPASSRLS admin client explicitly, but createBoardMemberAction passes the editor
+// SESSION client so RLS is the real boundary. A default would be an RLS-bypass footgun
+// (red-team-code advisory): a future CRUD caller could omit it and silently write past
+// RLS. This now matches its four sibling CRUD mutators, none of which default the client.
 export async function createBoardMember(
   input: CreateBoardMemberInput,
-  supabase: SupabaseClient = createAdminClient(),
+  supabase: SupabaseClient,
 ): Promise<BoardMember> {
+  // SSRF/write-boundary guard (red-team): reject a photo_url that is neither a local
+  // /public path nor an allowlisted host, BEFORE it reaches the DB. Seed fixtures use
+  // local /seed/*.png paths, so they pass unchanged.
+  assertBoardPhotoUrlAllowed(input.photoUrl);
+
   const { data, error } = await supabase
     .from("board_members")
     .insert({
@@ -347,4 +343,190 @@ export async function createBoardMember(
 
   if (error) throw error;
   return toMember(data as BoardMemberRow);
+}
+
+// ---------------------------------------------------------------------------
+// photo_url write-boundary guard (red-team SSRF item).
+//
+// A board photo is rendered by next/image on the public /about page. next.config.ts
+// configures NO `remotePatterns`, so next/image can only render LOCAL /public paths —
+// a remote host would 500 at render even if it reached the DB. We therefore reject, at
+// the WRITE boundary, any photo_url that is neither a local path nor an ALLOWLISTED
+// host, so an editor cannot persist an arbitrary off-site (SSRF-shaped) URL.
+// ---------------------------------------------------------------------------
+
+// Allowlisted remote hosts for board photos. EMPTY today by design: local /public
+// paths are the only render-safe source while next.config.ts has no remotePatterns.
+// This is the single FORWARD SEAM — adding a host here is a deliberate, PAIRED change
+// with a matching next.config remotePatterns entry, never a silent widening.
+const BOARD_PHOTO_ALLOWED_HOSTS: readonly string[] = [];
+
+// Thrown when a photo_url fails the allowlist. A distinct type so a Server Action can
+// map it to a friendly form error (vs re-throwing an unexpected DB/transport error).
+export class BoardPhotoUrlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BoardPhotoUrlError";
+  }
+}
+
+// Reject a photo_url that is neither a local /public path nor an allowlisted host.
+// `null`/`undefined`/'' are the legitimate missing-photo state and pass through. A
+// relative path MUST start with '/' (a bare 'evil.com/x' is not local). A parseable
+// absolute URL is allowed ONLY if its host is allowlisted; anything unparseable or
+// off-allowlist throws BoardPhotoUrlError.
+export function assertBoardPhotoUrlAllowed(
+  photoUrl: string | null | undefined,
+): void {
+  if (photoUrl == null || photoUrl === "") return; // missing-photo state
+  if (photoUrl.startsWith("/") && !photoUrl.startsWith("//")) return; // local path
+  let host: string;
+  try {
+    host = new URL(photoUrl).host;
+  } catch {
+    throw new BoardPhotoUrlError(
+      "Photo URL must be a local path starting with “/” or an allowlisted URL.",
+    );
+  }
+  if (!BOARD_PHOTO_ALLOWED_HOSTS.includes(host)) {
+    throw new BoardPhotoUrlError(
+      `Photo URL host “${host}” is not on the allowlist.`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Admin CRUD write paths (about-e2e-004..006). These take an INJECTABLE client with
+// NO default: the admin UI ALWAYS passes the RLS-ENFORCED cookie SESSION client
+// (createSupabaseServerClient), so every write runs as the editor and the 0007
+// policies are the real boundary. There is NO admin-client default here — a mutation
+// must never silently bypass RLS the way the seed path deliberately does. DB errors /
+// RLS denials surface as PostgrestError (e.g. PGRST116 when 0 rows match, which is how
+// the H2 archived-term guard presents), which the Server Action maps to a form error.
+// ---------------------------------------------------------------------------
+
+// updateMission (about-e2e-004): edit the mission prose in place. UPDATE (not upsert)
+// of the ABOUT_MISSION_SLUG row — the mission is seeded, so this only edits `body`;
+// `title` is left untouched. RLS `site_content_editor_update` enforces the editor role;
+// a non-editor matches 0 rows and `.single()` throws PGRST116. Returns the fresh row so
+// the caller can revalidate /about with the new copy.
+export async function updateMission(
+  body: string,
+  supabase: SupabaseClient,
+): Promise<Mission> {
+  const { data, error } = await supabase
+    .from("site_content")
+    .update({ body })
+    .eq("slug", ABOUT_MISSION_SLUG)
+    .select(MISSION_COLUMNS)
+    .single();
+
+  if (error) throw error;
+  return toMission(data as SiteContentRow);
+}
+
+// updateBoardMember (about-e2e-005): PATCH one current-term member. Only the supplied
+// fields are written (an omitted key leaves its column untouched); `photoUrl: null`
+// clears the photo. The photo guard runs BEFORE the write. RLS
+// `board_members_editor_update` enforces editor + CURRENT-TERM-ONLY: updating an
+// archived-term member matches 0 rows (H2 permanence) and `.single()` throws PGRST116.
+export async function updateBoardMember(
+  id: string,
+  fields: UpdateBoardMemberFields,
+  supabase: SupabaseClient,
+): Promise<BoardMember> {
+  if ("photoUrl" in fields) {
+    assertBoardPhotoUrlAllowed(fields.photoUrl);
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (fields.name !== undefined) patch.name = fields.name;
+  if (fields.seat !== undefined) patch.seat = fields.seat;
+  if (fields.role !== undefined) patch.role = fields.role;
+  if ("photoUrl" in fields) patch.photo_url = fields.photoUrl ?? null;
+  if (fields.bio !== undefined) patch.bio = fields.bio;
+  if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;
+
+  const { data, error } = await supabase
+    .from("board_members")
+    .update(patch)
+    .eq("id", id)
+    .select(MEMBER_COLUMNS)
+    .single();
+
+  if (error) throw error;
+  return toMember(data as BoardMemberRow);
+}
+
+// deleteBoardMember (about-e2e-005): remove one current-term member. RLS
+// `board_members_editor_delete` enforces editor + CURRENT-TERM-ONLY, so deleting an
+// archived-term member affects 0 rows (H2 permanence) — the caller re-reads the roster
+// to confirm. Returns nothing; a DB/transport error THROWS.
+export async function deleteBoardMember(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<void> {
+  const { error } = await supabase
+    .from("board_members")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+// rollBoardTerm (about-e2e-006): roll the board to a new term WITHOUT touching the
+// prior roster. ORDER MATTERS for the 0006 immediate partial-unique index
+// (board_terms_single_current_idx): we ARCHIVE the outgoing current term FIRST
+// (is_current=false), THEN INSERT the new current term — so the index never sees two
+// is_current=true rows. The new term's sort_order is the outgoing term's + 10, keeping
+// it newest in the archive ordering once it is itself later rolled. Both statements run
+// through the editor session client (RLS `board_terms_editor_update` / `_insert`). No
+// prior-term member is read, updated, or deleted — permanence holds by construction.
+//
+// KNOWN WINDOW (documented, acceptable for an editor action): between the archive and
+// the insert there is transiently no current term; if the INSERT fails, the old term
+// stays archived and the caller sees the error. Making the pair atomic (a single
+// SECURITY DEFINER SQL function / transaction) is the forward hardening if this proves
+// fragile — not built now.
+export async function rollBoardTerm(
+  input: RollBoardTermInput,
+  supabase: SupabaseClient,
+): Promise<BoardTerm> {
+  // Discover the outgoing current term (if any) to derive ordering + archive it.
+  const { data: currentData, error: currentErr } = await supabase
+    .from("board_terms")
+    .select(TERM_COLUMNS)
+    .eq("is_current", true)
+    .maybeSingle();
+
+  if (currentErr) throw currentErr;
+
+  let nextSortOrder = 0;
+  if (currentData != null) {
+    const outgoing = toTerm(currentData as BoardTermRow);
+    nextSortOrder = outgoing.sortOrder + 10;
+
+    // Archive FIRST so the partial-unique index is free for the new current term.
+    const { error: archiveErr } = await supabase
+      .from("board_terms")
+      .update({ is_current: false })
+      .eq("id", outgoing.id);
+
+    if (archiveErr) throw archiveErr;
+  }
+
+  // Create the new CURRENT term. is_current=true is now collision-free.
+  const { data, error } = await supabase
+    .from("board_terms")
+    .insert({
+      slug: input.newSlug,
+      label: input.newLabel,
+      is_current: true,
+      sort_order: nextSortOrder,
+    })
+    .select(TERM_COLUMNS)
+    .single();
+
+  if (error) throw error;
+  return toTerm(data as BoardTermRow);
 }

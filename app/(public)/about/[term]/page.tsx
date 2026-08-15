@@ -3,6 +3,11 @@ import Link from "next/link";
 import { listBoardForTerm } from "@/lib/board";
 import { BoardRoster } from "@/components/ui/board-roster";
 
+// Per-request render: this reads Supabase (RLS publishable client) for a term's roster.
+// force-dynamic keeps it off the static-export path so `next build` never invokes the
+// Supabase factory at build time (no env on the Fly builder). Mirrors /about + /news.
+export const dynamic = "force-dynamic";
+
 // DELIVER (Node 1): read-only archived roster for one term, from the REAL Supabase read
 // via lib/board (RLS-enforced publishable client). `params` is a Promise in Next 16 and
 // MUST be awaited (03-layouts-and-pages.md §"Creating a dynamic segment").

@@ -17,11 +17,16 @@
 //
 // Relative imports (not `@/…`) so the standalone runner resolves cleanly.
 import { createBoardMember, upsertBoardTerm, upsertMission } from "../lib/board";
+import { createAdminClient } from "../lib/supabase/admin";
 import { SEED_BOARD_TERMS, SEED_MISSION } from "../lib/seed/about-fixtures";
 
 async function main(): Promise<void> {
   let membersCreated = 0;
   let membersExisting = 0;
+
+  // The seed writes past RLS deliberately (bootstrap data), so it uses the BYPASSRLS
+  // admin client — passed EXPLICITLY to createBoardMember, which no longer defaults it.
+  const admin = createAdminClient();
 
   await upsertMission(SEED_MISSION);
   console.log("  mission  about_mission (upserted)");
@@ -32,7 +37,7 @@ async function main(): Promise<void> {
 
     for (const member of members) {
       try {
-        await createBoardMember({ ...member, termId: saved.id });
+        await createBoardMember({ ...member, termId: saved.id }, admin);
         membersCreated += 1;
         console.log(`  member   ${saved.slug} / ${member.name}`);
       } catch (err) {

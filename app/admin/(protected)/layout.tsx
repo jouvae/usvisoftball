@@ -1,5 +1,13 @@
 import { requireUser } from "@/lib/auth";
 
+// Force per-request rendering for the ENTIRE protected admin subtree. These pages are
+// auth-gated and read RLS-personalized data, so they must never be statically
+// prerendered — and, critically, this skips Next's build-time dynamic-detection trial
+// render, which would otherwise invoke the Supabase client factory at BUILD time (no
+// env on the Fly builder → "Missing NEXT_PUBLIC_SUPABASE_URL" → build fails). Applies to
+// every child segment (server-actions.md; route-segment-config.md §"dynamic").
+export const dynamic = "force-dynamic";
+
 // Layer B — THE security boundary. `requireUser()` runs as the FIRST await, before
 // any child renders: an anon request is redirected (307) to `/admin/login` and the
 // dashboard page never executes, so no admin data is serialized.

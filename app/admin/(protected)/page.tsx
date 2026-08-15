@@ -64,6 +64,19 @@ export default async function AdminDashboardPage() {
               Editorial queue
             </Link>
           ) : null}
+          {/* The board admin screen (about-e2e-004..006) is editor-only — it mirrors
+              the `canReview` gate. Every board Server Action re-runs requireRole
+              ('editor') and RLS re-enforces at the row, so this gate only decides
+              what to render. */}
+          {canReview ? (
+            <Link
+              data-testid="admin-board-link"
+              href="/admin/board"
+              className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+            >
+              Board admin
+            </Link>
+          ) : null}
           {/* The AI draft panel is for contributor OR editor (slice-09 §5.1), and
               only when the NEXT_PUBLIC_AI_DRAFT_ENABLED flag is on — prod hides it. */}
           {AI_DRAFT_ENABLED && (canAuthor || canReview) ? (
