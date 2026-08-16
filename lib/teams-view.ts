@@ -24,7 +24,7 @@ export const ISLAND_ORDER: readonly Island[] = ["st_thomas", "st_john", "st_croi
 export interface Team {
   id: string;
   name: string;
-  slug: string; // URL-safe key for a future /teams/[slug] page
+  slug: string; // URL-safe key for the /teams/[slug] detail page
   island: Island;
   division: string; // free text: Men's / Women's / Coed / Youth
   description: string;
@@ -32,4 +32,21 @@ export interface Team {
   homeVenue: string;
   foundedYear: number | null;
   sortOrder: number;
+}
+
+// A roster player on a team (team detail page).
+export interface TeamPlayer {
+  id: string;
+  name: string;
+  jerseyNumber: number | null;
+  position: string; // free text: P / C / 1B / SS / OF …
+  batsThrows: string; // free text: R/R, L/L, S/R …
+  hometown: string;
+  photoUrl: string;
+  sortOrder: number;
+}
+
+// A team paired with its ordered roster — the shape the detail read returns.
+export interface TeamWithRoster extends Team {
+  players: TeamPlayer[];
 }

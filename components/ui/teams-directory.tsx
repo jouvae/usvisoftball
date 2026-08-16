@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Island, Team } from "@/lib/teams";
 
 // The public teams directory on /teams (teams-web-001). Server Component — no
@@ -44,11 +45,14 @@ export function TeamsDirectory({
                     className="h-16 w-16 rounded-md object-contain"
                   />
                 ) : null}
-                <h3
-                  data-testid="team-name"
-                  className="font-display text-xl font-bold leading-tight tracking-tight text-brand"
-                >
-                  {team.name}
+                <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-brand">
+                  <Link
+                    href={`/teams/${team.slug}`}
+                    data-testid="team-name"
+                    className="underline-offset-4 hover:text-brand-hover hover:underline"
+                  >
+                    {team.name}
+                  </Link>
                 </h3>
                 <span
                   data-testid="team-division"

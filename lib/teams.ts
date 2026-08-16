@@ -4,6 +4,8 @@ import { createPublicClient } from "@/lib/supabase/public";
 import {
   type Island,
   type Team,
+  type TeamPlayer,
+  type TeamWithRoster,
   ISLAND_LABELS,
   ISLAND_ORDER,
 } from "@/lib/teams-view";
@@ -20,9 +22,38 @@ import {
 export {
   type Island,
   type Team,
+  type TeamPlayer,
+  type TeamWithRoster,
   ISLAND_LABELS,
   ISLAND_ORDER,
 };
+
+type PlayerRow = {
+  id: string;
+  name: string;
+  jersey_number: number | null;
+  position: string;
+  bats_throws: string;
+  hometown: string;
+  photo_url: string;
+  sort_order: number;
+};
+
+function toPlayer(row: PlayerRow): TeamPlayer {
+  return {
+    id: row.id,
+    name: row.name,
+    jerseyNumber: row.jersey_number,
+    position: row.position,
+    batsThrows: row.bats_throws,
+    hometown: row.hometown,
+    photoUrl: row.photo_url,
+    sortOrder: row.sort_order,
+  };
+}
+
+const PLAYER_COLUMNS =
+  "id,name,jersey_number,position,bats_throws,hometown,photo_url,sort_order";
 
 type TeamRow = {
   id: string;
@@ -79,4 +110,25 @@ export function groupTeamsByIsland(
     label: ISLAND_LABELS[island],
     teams: teams.filter((t) => t.island === island),
   })).filter((g) => g.teams.length > 0);
+}
+
+// One team by slug, with its ordered roster (single embedded read). Returns null when the
+// slug doesn't exist — the detail page maps that to a 404. Roster ordered (sort_order, name).
+export async function getTeamBySlug(
+  slug: string,
+  supabase: SupabaseClient = createPublicClient(),
+): Promise<TeamWithRoster | null> {
+  const { data, error } = await supabase
+    .from("teams")
+    .select(`${COLUMNS},team_players(${PLAYER_COLUMNS})`)
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as TeamRow & { team_players: PlayerRow[] | null };
+  const players = (row.team_players ?? [])
+    .map(toPlayer)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return { ...toTeam(row), players };
 }
