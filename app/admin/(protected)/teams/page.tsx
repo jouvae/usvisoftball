@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/roles";
 import { listTeams } from "@/lib/teams";
 import { TeamForm } from "@/components/client/team-form";
@@ -62,12 +63,21 @@ export default async function TeamsAdminPage() {
               submitLabel="Save team"
               errorTestId="team-edit-error"
             />
-            <TeamDeleteButton
-              action={deleteTeamAction.bind(null, team.id)}
-              testId="team-delete"
-              errorTestId="team-delete-error"
-              label="Delete team"
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href={`/admin/teams/${team.slug}`}
+                data-testid="manage-roster-link"
+                className="w-fit rounded-md border border-border px-3 py-1.5 text-sm font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+              >
+                Manage roster
+              </Link>
+              <TeamDeleteButton
+                action={deleteTeamAction.bind(null, team.id)}
+                testId="team-delete"
+                errorTestId="team-delete-error"
+                label="Delete team"
+              />
+            </div>
           </li>
         ))}
       </ul>

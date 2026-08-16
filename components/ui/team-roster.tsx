@@ -1,3 +1,4 @@
+import { safePhotoHref } from "@/lib/teams-view";
 import type { TeamPlayer } from "@/lib/teams";
 
 // The roster table on a team detail page (teams-web-002). Server Component — no
@@ -49,7 +50,18 @@ export function TeamRoster({
                 data-testid="player-name"
                 className="py-2 pr-4 font-medium text-foreground"
               >
-                {p.name}
+                <span className="flex items-center gap-2">
+                  {safePhotoHref(p.photoUrl) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={safePhotoHref(p.photoUrl)}
+                      alt=""
+                      data-testid="player-photo"
+                      className="h-7 w-7 rounded-full object-cover"
+                    />
+                  ) : null}
+                  {p.name}
+                </span>
               </td>
               <td data-testid="player-position" className="py-2 pr-4 text-muted">
                 {p.position || "—"}

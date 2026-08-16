@@ -397,7 +397,11 @@ export function assertBoardPhotoUrlAllowed(
   photoUrl: string | null | undefined,
 ): void {
   if (photoUrl == null || photoUrl === "") return; // missing-photo state
-  if (photoUrl.startsWith("/") && !photoUrl.startsWith("//")) return; // local path
+  // A local /public path must start with a single '/' and NOT smuggle an authority via a
+  // second slash OR a backslash — the URL parser resolves '/\host' off-origin. This mirrors
+  // the render-side safePhotoHref guard so a stored value can never resolve off-origin even
+  // if a future render path (next/image, email, RSS) omits the guard (red-team parity).
+  if (/^\/(?![/\\])/.test(photoUrl)) return; // local path
   if (isBoardPhotoStorageUrl(photoUrl)) return; // an uploaded board photo (0009 bucket)
   let host: string;
   try {

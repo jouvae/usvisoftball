@@ -251,6 +251,101 @@ export async function getTeamLogoUrl(
   return url ? url : null;
 }
 
+// ── team_players (roster) CRUD (teams-e2e-004) ───────────────────────────────
+// Same discipline: injectable session client (no admin default), photo via the reused
+// board allowlist. Players belong to a team; the team_id is server-bound by the caller.
+
+export interface CreateTeamPlayerInput {
+  teamId: string;
+  name: string;
+  jerseyNumber?: number | null;
+  position?: string;
+  batsThrows?: string;
+  hometown?: string;
+  photoUrl?: string | null;
+  sortOrder?: number;
+}
+
+export interface UpdateTeamPlayerFields {
+  name?: string;
+  jerseyNumber?: number | null;
+  position?: string;
+  batsThrows?: string;
+  hometown?: string;
+  photoUrl?: string | null;
+  sortOrder?: number;
+}
+
+export async function createTeamPlayer(
+  input: CreateTeamPlayerInput,
+  supabase: SupabaseClient,
+): Promise<TeamPlayer> {
+  assertBoardPhotoUrlAllowed(input.photoUrl);
+  const { data, error } = await supabase
+    .from("team_players")
+    .insert({
+      team_id: input.teamId,
+      name: input.name,
+      jersey_number: input.jerseyNumber ?? null,
+      position: input.position ?? "",
+      bats_throws: input.batsThrows ?? "",
+      hometown: input.hometown ?? "",
+      photo_url: input.photoUrl ?? "",
+      sort_order: input.sortOrder ?? 0,
+    })
+    .select(PLAYER_COLUMNS)
+    .single();
+  if (error) throw error;
+  return toPlayer(data as PlayerRow);
+}
+
+export async function updateTeamPlayer(
+  id: string,
+  fields: UpdateTeamPlayerFields,
+  supabase: SupabaseClient,
+): Promise<TeamPlayer> {
+  if (fields.photoUrl !== undefined) assertBoardPhotoUrlAllowed(fields.photoUrl);
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (fields.name !== undefined) patch.name = fields.name;
+  if (fields.jerseyNumber !== undefined) patch.jersey_number = fields.jerseyNumber;
+  if (fields.position !== undefined) patch.position = fields.position;
+  if (fields.batsThrows !== undefined) patch.bats_throws = fields.batsThrows;
+  if (fields.hometown !== undefined) patch.hometown = fields.hometown;
+  if (fields.photoUrl !== undefined) patch.photo_url = fields.photoUrl ?? "";
+  if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;
+
+  const { data, error } = await supabase
+    .from("team_players")
+    .update(patch)
+    .eq("id", id)
+    .select(PLAYER_COLUMNS)
+    .single();
+  if (error) throw error;
+  return toPlayer(data as PlayerRow);
+}
+
+export async function deleteTeamPlayer(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<void> {
+  const { error } = await supabase.from("team_players").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function getTeamPlayerPhotoUrl(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("team_players")
+    .select("photo_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  const url = (data as { photo_url: string | null } | null)?.photo_url;
+  return url ? url : null;
+}
+
 // All Storage photo URLs owned by a team (its logo + its players' photos) — read BEFORE a
 // cascade delete so the caller can reap the objects afterward.
 export async function getTeamOwnedPhotoUrls(
