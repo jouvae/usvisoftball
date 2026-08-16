@@ -20,6 +20,22 @@ export const ISLAND_LABELS: Record<Island, string> = {
 // Display order for the directory's island groups.
 export const ISLAND_ORDER: readonly Island[] = ["st_thomas", "st_john", "st_croix"];
 
+// Render-time guard for a team logo URL (red-team-code Low from slice 1, now that the CRUD
+// slice lets an editor set logo_url). Return the URL to use as an <img src> ONLY if it is a
+// local /public path or an https URL; otherwise ''. Blocks a stored javascript:/data: (or
+// other scheme) value from ever reaching the DOM as a live src. Mirrors the board photo /
+// contact link write+render defense-in-depth. Uploaded logos are board-photos https URLs, so
+// they pass; typed local paths pass; anything else is dropped at render.
+export function safeLogoHref(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("/") && !url.startsWith("//")) return url; // local /public path
+  try {
+    return new URL(url).protocol === "https:" ? url : "";
+  } catch {
+    return "";
+  }
+}
+
 // A member team / club.
 export interface Team {
   id: string;

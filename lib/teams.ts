@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPublicClient } from "@/lib/supabase/public";
+import { assertBoardPhotoUrlAllowed } from "@/lib/board";
 import {
   type Island,
   type Team,
@@ -131,4 +132,141 @@ export async function getTeamBySlug(
     .map(toPlayer)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   return { ...toTeam(row), players };
+}
+
+// ---------------------------------------------------------------------------
+// Admin CRUD write paths (teams-e2e-003). Every mutator takes an INJECTABLE session client
+// with NO default — /admin/teams always passes the editor cookie client, so the 0015 editor
+// RLS is the real boundary. A non-editor matches 0 rows → PGRST116. Deleting a team cascades
+// its team_players. Logo reuses the board photo allowlist (assertBoardPhotoUrlAllowed).
+// ---------------------------------------------------------------------------
+
+export interface CreateTeamInput {
+  name: string;
+  island: Island;
+  division?: string;
+  description?: string;
+  logoUrl?: string | null;
+  homeVenue?: string;
+  foundedYear?: number | null;
+  sortOrder?: number;
+}
+
+export interface UpdateTeamFields {
+  name?: string;
+  island?: Island;
+  division?: string;
+  description?: string;
+  logoUrl?: string | null;
+  homeVenue?: string;
+  foundedYear?: number | null;
+  sortOrder?: number;
+}
+
+// URL-safe slug from the team name. Stable once created (never re-derived on edit) so the
+// /teams/[slug] detail URL doesn't break when a name is corrected.
+function slugifyTeam(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "team"
+  );
+}
+
+export async function createTeam(
+  input: CreateTeamInput,
+  supabase: SupabaseClient,
+): Promise<Team> {
+  assertBoardPhotoUrlAllowed(input.logoUrl);
+  const { data, error } = await supabase
+    .from("teams")
+    .insert({
+      name: input.name,
+      slug: slugifyTeam(input.name),
+      island: input.island,
+      division: input.division ?? "",
+      description: input.description ?? "",
+      logo_url: input.logoUrl ?? "",
+      home_venue: input.homeVenue ?? "",
+      founded_year: input.foundedYear ?? null,
+      sort_order: input.sortOrder ?? 0,
+    })
+    .select(COLUMNS)
+    .single();
+  if (error) throw error;
+  return toTeam(data as TeamRow);
+}
+
+// Update a team's fields. The slug is intentionally NOT changed (detail URL stays stable).
+export async function updateTeam(
+  id: string,
+  fields: UpdateTeamFields,
+  supabase: SupabaseClient,
+): Promise<Team> {
+  if (fields.logoUrl !== undefined) assertBoardPhotoUrlAllowed(fields.logoUrl);
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (fields.name !== undefined) patch.name = fields.name;
+  if (fields.island !== undefined) patch.island = fields.island;
+  if (fields.division !== undefined) patch.division = fields.division;
+  if (fields.description !== undefined) patch.description = fields.description;
+  if (fields.logoUrl !== undefined) patch.logo_url = fields.logoUrl ?? "";
+  if (fields.homeVenue !== undefined) patch.home_venue = fields.homeVenue;
+  if (fields.foundedYear !== undefined) patch.founded_year = fields.foundedYear;
+  if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;
+
+  const { data, error } = await supabase
+    .from("teams")
+    .update(patch)
+    .eq("id", id)
+    .select(COLUMNS)
+    .single();
+  if (error) throw error;
+  return toTeam(data as TeamRow);
+}
+
+// Delete a team. Its team_players cascade (FK on delete cascade).
+export async function deleteTeam(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<void> {
+  const { error } = await supabase.from("teams").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// One team's logo_url (or null) — for deleting the prior Storage object on replace/clear.
+export async function getTeamLogoUrl(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("teams")
+    .select("logo_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  const url = (data as { logo_url: string | null } | null)?.logo_url;
+  return url ? url : null;
+}
+
+// All Storage photo URLs owned by a team (its logo + its players' photos) — read BEFORE a
+// cascade delete so the caller can reap the objects afterward.
+export async function getTeamOwnedPhotoUrls(
+  id: string,
+  supabase: SupabaseClient,
+): Promise<string[]> {
+  const urls: string[] = [];
+  const logo = await getTeamLogoUrl(id, supabase);
+  if (logo) urls.push(logo);
+  const { data } = await supabase
+    .from("team_players")
+    .select("photo_url")
+    .eq("team_id", id);
+  for (const r of data ?? []) {
+    const u = (r as { photo_url: string | null }).photo_url;
+    if (u) urls.push(u);
+  }
+  return urls;
 }

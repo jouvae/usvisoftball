@@ -100,6 +100,18 @@ export default async function AdminDashboardPage() {
               Committees admin
             </Link>
           ) : null}
+          {/* The teams admin screen (teams-e2e-003) is editor-only — same canReview
+              gate; every team Server Action re-runs requireRole('editor') and RLS
+              re-enforces at the row, so this gate only decides what to render. */}
+          {canReview ? (
+            <Link
+              data-testid="admin-teams-link"
+              href="/admin/teams"
+              className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+            >
+              Teams admin
+            </Link>
+          ) : null}
           {/* The AI draft panel is for contributor OR editor (slice-09 §5.1), and
               only when the NEXT_PUBLIC_AI_DRAFT_ENABLED flag is on — prod hides it. */}
           {AI_DRAFT_ENABLED && (canAuthor || canReview) ? (

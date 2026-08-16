@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { safeLogoHref } from "@/lib/teams-view";
 import type { Island, Team } from "@/lib/teams";
 
 // The public teams directory on /teams (teams-web-001). Server Component — no
@@ -30,16 +31,18 @@ export function TeamsDirectory({
             {group.label}
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {group.teams.map((team) => (
+            {group.teams.map((team) => {
+              const logo = safeLogoHref(team.logoUrl);
+              return (
               <article
                 key={team.id}
                 data-testid="team-card"
                 className="flex flex-col gap-3 rounded-lg border border-border bg-background p-5"
               >
-                {team.logoUrl ? (
+                {logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={team.logoUrl}
+                    src={logo}
                     alt={`${team.name} logo`}
                     data-testid="team-logo"
                     className="h-16 w-16 rounded-md object-contain"
@@ -75,7 +78,8 @@ export function TeamsDirectory({
                   </p>
                 ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
