@@ -5,6 +5,8 @@
 // lib/teams.ts (server-only) re-exports every symbol here, so server callers keep importing
 // from "@/lib/teams". Same split as lib/board-view.ts.
 
+import { safeStoredImageHref } from "@/lib/safe-image-url";
+
 // The three USVI islands. Union mirrors the 0013 CHECK (island in
 // ('st_thomas','st_john','st_croix')) — keep the two in lockstep.
 export type Island = "st_thomas" | "st_john" | "st_croix";
@@ -20,36 +22,15 @@ export const ISLAND_LABELS: Record<Island, string> = {
 // Display order for the directory's island groups.
 export const ISLAND_ORDER: readonly Island[] = ["st_thomas", "st_john", "st_croix"];
 
-// Render-time guard for a team logo URL (red-team-code Low from slice 1, now that the CRUD
-// slice lets an editor set logo_url). Return the URL to use as an <img src> ONLY if it is a
-// local /public path or an https URL; otherwise ''. Blocks a stored javascript:/data: (or
-// other scheme) value from ever reaching the DOM as a live src. Mirrors the board photo /
-// contact link write+render defense-in-depth. Uploaded logos are board-photos https URLs, so
-// they pass; typed local paths pass; anything else is dropped at render.
+// Render-time guard for team logos / player headshots. Delegates to the single shared,
+// host-aware guard (lib/safe-image-url) so the write/render parity can never drift — an
+// off-site https URL whose path merely matched the storage prefix is now dropped (a
+// host-blind copy previously let it render; red-team-interactive Medium).
 export function safeLogoHref(url: string): string {
-  return safePhotoHref(url);
+  return safeStoredImageHref(url);
 }
-
-// Same render-time guard, for any team-side image URL (team logo, player headshot): return
-// the URL only if it's a local /public path OR an https URL whose path is a Supabase Storage
-// board-photos public object, else ''. Blocks a stored javascript:/data:/protocol-relative
-// value AND an arbitrary off-site https host from ever reaching the DOM as a live src —
-// matching the write guard's intent (uploaded photos are always board-photos URLs).
 export function safePhotoHref(url: string): string {
-  if (!url) return "";
-  // A local /public path must start with a single '/' AND not smuggle an authority via a
-  // second slash OR a BACKSLASH — the WHATWG URL parser treats '/\host' as protocol-relative
-  // and resolves it off-origin. So the char after '/' must be a normal path char.
-  if (/^\/(?![/\\])/.test(url)) return url; // local /public path
-  try {
-    const u = new URL(url);
-    const ok =
-      u.protocol === "https:" &&
-      u.pathname.startsWith("/storage/v1/object/public/board-photos/");
-    return ok ? url : "";
-  } catch {
-    return "";
-  }
+  return safeStoredImageHref(url);
 }
 
 // A member team / club.

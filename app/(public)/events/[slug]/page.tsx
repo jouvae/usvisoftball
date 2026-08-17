@@ -4,6 +4,7 @@ import {
   getEventBySlug,
   EVENT_ISLAND_LABELS,
   formatEventDateRange,
+  safeEventLogoHref,
 } from "@/lib/events";
 
 // DELIVER (events-web-002): one event's detail page — event info — from the REAL Supabase
@@ -21,6 +22,7 @@ export default async function EventDetailPage({
 
   const dates = formatEventDateRange(event.startDate, event.endDate);
   const island = event.island ? EVENT_ISLAND_LABELS[event.island] : "";
+  const logo = safeEventLogoHref(event.logoUrl);
 
   return (
     <section
@@ -34,6 +36,15 @@ export default async function EventDetailPage({
         >
           ← Events
         </Link>
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo}
+            alt={`${event.name} logo`}
+            data-testid="event-detail-logo"
+            className="h-24 w-24 rounded-md object-contain"
+          />
+        ) : null}
         <h1
           data-testid="event-detail-name"
           className="font-display text-4xl font-bold uppercase tracking-tight text-brand"

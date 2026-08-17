@@ -4,6 +4,8 @@
 // events-admin island's island <select> needs ISLAND_LABELS). lib/events.ts (server-only)
 // re-exports these. Same split as lib/teams-view.ts / lib/board-view.ts.
 
+import { safeStoredImageHref } from "@/lib/safe-image-url";
+
 // Reuse the same three-island taxonomy as teams; an event's island is OPTIONAL (a
 // territory-wide event spans all islands → null).
 export type EventIsland = "st_thomas" | "st_john" | "st_croix";
@@ -13,6 +15,13 @@ export const EVENT_ISLAND_LABELS: Record<EventIsland, string> = {
   st_john: "St. John",
   st_croix: "St. Croix",
 };
+
+// Render-time guard for an event logo URL. Delegates to the single shared, host-aware guard
+// (lib/safe-image-url) so it stays in lockstep with the teams guard and the write boundary —
+// an off-site https URL whose path merely matched the storage prefix is dropped.
+export function safeEventLogoHref(url: string): string {
+  return safeStoredImageHref(url);
+}
 
 // A federation event / tournament.
 export interface FederationEvent {

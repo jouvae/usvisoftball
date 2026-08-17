@@ -1,24 +1,24 @@
 "use client";
 
 import { useActionState } from "react";
-// ANTI-LEAK: ISLAND_LABELS is a client-safe RUNTIME value — import it from the
-// view module (no `server-only`), NEVER from "@/lib/teams" (server-only). Team is
-// a type-only import from the same client-safe module.
-import { ISLAND_LABELS, safeLogoHref } from "@/lib/teams-view";
-import type { Team, Island } from "@/lib/teams-view";
-import type { TeamActionState } from "@/app/admin/(protected)/teams/actions";
+// ANTI-LEAK: EVENT_ISLAND_LABELS is a client-safe RUNTIME value — import it from the
+// view module (no `server-only`), NEVER from "@/lib/events" (server-only). FederationEvent
+// is a type-only import from the same client-safe module.
+import { EVENT_ISLAND_LABELS, safeEventLogoHref } from "@/lib/events-view";
+import type { FederationEvent, EventIsland } from "@/lib/events-view";
+import type { EventActionState } from "@/app/admin/(protected)/events/actions";
 
-// The team form island (teams-e2e-003). ONE island serves BOTH add and edit: the caller
-// passes an id-bound `action`, the mode-specific testids, and (for edit) a `team` to
+// The event form island (events-e2e-003). ONE island serves BOTH add and edit: the caller
+// passes an id-bound `action`, the mode-specific testids, and (for edit) an `event` to
 // prefill. `useActionState` tracks pending + surfaces the returned error. On success the
 // action revalidates this route, so the list re-renders in the same response. Logo handling
-// mirrors the committee-member photo block: a chosen file → upload; else the remove toggle
-// → clear; else the local-path text; else the current logo is preserved server-side. Only a
-// LOCAL /public path prefills the text box; an uploaded Storage URL is shown as a preview.
-// Navy-on-white per DESIGN.md; no gold, no dangerouslySetInnerHTML.
-export function TeamForm({
+// mirrors the team-form block: a chosen file → upload; else the remove toggle → clear; else
+// the local-path text; else the current logo is preserved server-side. Only a LOCAL /public
+// path prefills the text box; an uploaded Storage URL is shown as a preview. The island
+// <select> leads with a Territory-wide ('' → null) option. Navy-on-white per DESIGN.md.
+export function EventForm({
   action,
-  team,
+  event,
   formTestId,
   submitTestId,
   submitLabel,
@@ -26,24 +26,24 @@ export function TeamForm({
   className = "",
 }: {
   action: (
-    prevState: TeamActionState,
+    prevState: EventActionState,
     formData: FormData,
-  ) => Promise<TeamActionState>;
-  team?: Team;
+  ) => Promise<EventActionState>;
+  event?: FederationEvent;
   formTestId: string;
   submitTestId: string;
   submitLabel: string;
   errorTestId: string;
   className?: string;
 }) {
-  const [state, formAction, pending] = useActionState<TeamActionState, FormData>(
-    action,
-    undefined,
-  );
+  const [state, formAction, pending] = useActionState<
+    EventActionState,
+    FormData
+  >(action, undefined);
 
-  const islandKeys = Object.keys(ISLAND_LABELS) as Island[];
-  const currentLogo = team?.logoUrl ?? "";
-  const previewSrc = safeLogoHref(currentLogo); // guard the preview too
+  const islandKeys = Object.keys(EVENT_ISLAND_LABELS) as EventIsland[];
+  const currentLogo = event?.logoUrl ?? "";
+  const previewSrc = safeEventLogoHref(currentLogo); // guard the preview too
   const localPathValue = currentLogo.startsWith("/") ? currentLogo : "";
 
   return (
@@ -58,8 +58,8 @@ export function TeamForm({
           type="text"
           name="name"
           required
-          defaultValue={team?.name ?? ""}
-          data-testid="team-name"
+          defaultValue={event?.name ?? ""}
+          data-testid="event-name"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
@@ -68,25 +68,48 @@ export function TeamForm({
         Island
         <select
           name="island"
-          defaultValue={team?.island ?? islandKeys[0]}
-          data-testid="team-island"
+          defaultValue={event?.island ?? ""}
+          data-testid="event-island"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         >
+          <option value="">Territory-wide (all islands)</option>
           {islandKeys.map((key) => (
             <option key={key} value={key}>
-              {ISLAND_LABELS[key]}
+              {EVENT_ISLAND_LABELS[key]}
             </option>
           ))}
         </select>
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-        Division
+        Start date
+        <input
+          type="date"
+          name="startDate"
+          defaultValue={event?.startDate ?? ""}
+          data-testid="event-start"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        End date
+        <input
+          type="date"
+          name="endDate"
+          defaultValue={event?.endDate ?? ""}
+          data-testid="event-end"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        Venue
         <input
           type="text"
-          name="division"
-          defaultValue={team?.division ?? ""}
-          data-testid="team-division"
+          name="venue"
+          defaultValue={event?.venue ?? ""}
+          data-testid="event-venue"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
@@ -96,30 +119,8 @@ export function TeamForm({
         <textarea
           name="description"
           rows={3}
-          defaultValue={team?.description ?? ""}
-          data-testid="team-description"
-          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-        Home venue
-        <input
-          type="text"
-          name="homeVenue"
-          defaultValue={team?.homeVenue ?? ""}
-          data-testid="team-venue"
-          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
-        Founded year
-        <input
-          type="number"
-          name="foundedYear"
-          defaultValue={team?.foundedYear ?? ""}
-          data-testid="team-founded"
+          defaultValue={event?.description ?? ""}
+          data-testid="event-description"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
@@ -129,14 +130,14 @@ export function TeamForm({
         <input
           type="number"
           name="sortOrder"
-          defaultValue={team?.sortOrder ?? 0}
-          data-testid="team-sort"
+          defaultValue={event?.sortOrder ?? 0}
+          data-testid="event-sort"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
 
       {/* Logo. Precedence (server-side): a chosen file → upload; else remove-toggle →
-          clear; else the local path text; else the team's CURRENT logo is preserved
+          clear; else the local path text; else the event's CURRENT logo is preserved
           server-side (read authoritatively, not from any client field). */}
       {currentLogo ? (
         <div className="flex items-center gap-3">
@@ -145,7 +146,7 @@ export function TeamForm({
             <img
               src={previewSrc}
               alt=""
-              data-testid="team-logo-current"
+              data-testid="event-logo-current"
               className="h-16 w-16 rounded-md border border-border object-contain"
             />
           ) : null}
@@ -154,7 +155,7 @@ export function TeamForm({
               type="checkbox"
               name="removeLogo"
               value="1"
-              data-testid="team-logo-remove"
+              data-testid="event-logo-remove"
             />
             Remove logo
           </label>
@@ -167,7 +168,7 @@ export function TeamForm({
           type="file"
           name="logoFile"
           accept="image/jpeg,image/png,image/webp"
-          data-testid="team-logo-file"
+          data-testid="event-logo-file"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
@@ -177,9 +178,9 @@ export function TeamForm({
         <input
           type="text"
           name="logoUrl"
-          placeholder="/seed/team.png"
+          placeholder="/seed/event.png"
           defaultValue={localPathValue}
-          data-testid="team-logo"
+          data-testid="event-logo"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
