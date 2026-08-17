@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   type FederationEvent,
   EVENT_ISLAND_LABELS,
@@ -31,11 +32,14 @@ function EventGroup({
               data-testid="event-card"
               className="flex flex-col gap-2 rounded-lg border border-border bg-background p-5"
             >
-              <h3
-                data-testid="event-name"
-                className="font-display text-xl font-bold leading-tight tracking-tight text-brand"
-              >
-                {ev.name}
+              <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-brand">
+                <Link
+                  href={`/events/${ev.slug}`}
+                  data-testid="event-name"
+                  className="underline-offset-4 hover:text-brand-hover hover:underline"
+                >
+                  {ev.name}
+                </Link>
               </h3>
               {dates ? (
                 <p

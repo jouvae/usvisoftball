@@ -66,6 +66,21 @@ export async function listEvents(
   return (data as EventRow[] | null ?? []).map(toEvent);
 }
 
+// One event by slug. Returns null when the slug doesn't exist — the detail page maps that
+// to a 404. The slug is passed as a parametrized .eq filter (no interpolation/injection).
+export async function getEventBySlug(
+  slug: string,
+  supabase: SupabaseClient = createPublicClient(),
+): Promise<FederationEvent | null> {
+  const { data, error } = await supabase
+    .from("events")
+    .select(COLUMNS)
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toEvent(data as EventRow) : null;
+}
+
 // Today's date as an ISO 'YYYY-MM-DD' string in UTC — the boundary for upcoming vs past.
 // Passed in so the pure split function stays deterministic/testable.
 export function todayISO(now: Date): string {
