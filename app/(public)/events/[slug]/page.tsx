@@ -7,6 +7,12 @@ import {
   safeEventLogoHref,
 } from "@/lib/events";
 
+// Event island labels reuse the shared taxonomy; team islands render the same way.
+function islandLabel(island: string | null): string {
+  if (!island) return "";
+  return (EVENT_ISLAND_LABELS as Record<string, string>)[island] ?? "";
+}
+
 // DELIVER (events-web-002): one event's detail page — event info — from the REAL Supabase
 // read via lib/events (RLS publishable client). `params` is a Promise in Next 16 and MUST
 // be awaited. Unknown slug → notFound() (404). force-dynamic: reads Supabase; no
@@ -73,6 +79,39 @@ export default async function EventDetailPage({
         >
           {event.description}
         </p>
+      ) : null}
+
+      {event.teams.length > 0 ? (
+        <section
+          data-testid="event-participants"
+          className="flex flex-col gap-4"
+        >
+          <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+            Participating Teams
+          </h2>
+          <ul role="list" className="flex flex-col gap-2">
+            {event.teams.map((team) => (
+              <li
+                key={team.id}
+                data-testid="event-participant"
+                className="flex flex-wrap items-center gap-x-2 text-foreground"
+              >
+                <Link
+                  href={`/teams/${team.slug}`}
+                  data-testid="event-participant-name"
+                  className="font-display text-lg font-semibold text-brand underline-offset-4 hover:text-brand-hover hover:underline"
+                >
+                  {team.name}
+                </Link>
+                {islandLabel(team.island) ? (
+                  <span className="text-sm text-muted">
+                    · {islandLabel(team.island)}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
     </section>
   );

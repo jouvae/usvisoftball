@@ -37,6 +37,21 @@ export interface FederationEvent {
   sortOrder: number;
 }
 
+// A team participating in an event (the event_teams join → teams). Lightweight: only what
+// the event detail's Participating Teams section renders + links to.
+export interface EventTeam {
+  id: string;
+  name: string;
+  slug: string; // links to /teams/[slug]
+  island: EventIsland | null;
+}
+
+// An event paired with its ordered list of participating teams — the shape the detail read
+// returns.
+export interface EventWithTeams extends FederationEvent {
+  teams: EventTeam[];
+}
+
 // Human date-range label for a card, e.g. "Jun 1–7, 2099" or "Aug 15, 2099". Pure + UTC so
 // server and client agree and it never depends on the viewer's timezone. Returns '' when no
 // dates are set.

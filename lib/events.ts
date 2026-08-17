@@ -5,6 +5,8 @@ import { assertBoardPhotoUrlAllowed } from "@/lib/board";
 import {
   type EventIsland,
   type FederationEvent,
+  type EventTeam,
+  type EventWithTeams,
   EVENT_ISLAND_LABELS,
   formatEventDateRange,
   safeEventLogoHref,
@@ -21,6 +23,8 @@ import {
 export {
   type EventIsland,
   type FederationEvent,
+  type EventTeam,
+  type EventWithTeams,
   EVENT_ISLAND_LABELS,
   formatEventDateRange,
   safeEventLogoHref,
@@ -69,19 +73,48 @@ export async function listEvents(
   return (data as EventRow[] | null ?? []).map(toEvent);
 }
 
-// One event by slug. Returns null when the slug doesn't exist — the detail page maps that
-// to a 404. The slug is passed as a parametrized .eq filter (no interpolation/injection).
+// One event by slug WITH its ordered participating teams (event_teams → teams embed).
+// Returns null when the slug doesn't exist — the detail page maps that to a 404. The slug is
+// a parametrized .eq filter (no injection). Teams sorted (event_teams.sort_order, then name).
 export async function getEventBySlug(
   slug: string,
   supabase: SupabaseClient = createPublicClient(),
-): Promise<FederationEvent | null> {
+): Promise<EventWithTeams | null> {
   const { data, error } = await supabase
     .from("events")
-    .select(COLUMNS)
+    .select(`${COLUMNS},event_teams(sort_order,teams(id,name,slug,island))`)
     .eq("slug", slug)
     .maybeSingle();
   if (error) throw error;
-  return data ? toEvent(data as EventRow) : null;
+  if (!data) return null;
+
+  type TeamEmbed = {
+    id: string;
+    name: string;
+    slug: string;
+    island: EventIsland | null;
+  };
+  type JoinRow = { sort_order: number; teams: TeamEmbed | TeamEmbed[] | null };
+  const row = data as unknown as EventRow & { event_teams: JoinRow[] | null };
+
+  const teams: EventTeam[] = (row.event_teams ?? [])
+    .map((j) => {
+      // A to-one FK embed returns an object; be defensive if it ever arrives as an array.
+      const t = Array.isArray(j.teams) ? j.teams[0] : j.teams;
+      return t ? { team: t, sortOrder: j.sort_order } : null;
+    })
+    .filter((x): x is { team: TeamEmbed; sortOrder: number } => x != null)
+    .sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.team.name.localeCompare(b.team.name),
+    )
+    .map(({ team }) => ({
+      id: team.id,
+      name: team.name,
+      slug: team.slug,
+      island: team.island,
+    }));
+
+  return { ...toEvent(row), teams };
 }
 
 // Today's date as an ISO 'YYYY-MM-DD' string in UTC — the boundary for upcoming vs past.
