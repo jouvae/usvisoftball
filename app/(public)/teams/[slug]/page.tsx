@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTeamBySlug, ISLAND_LABELS } from "@/lib/teams";
 import { TeamRoster } from "@/components/ui/team-roster";
+import { TEAMS_ENABLED } from "@/lib/flags";
 
 // DELIVER (teams-web-002): one team's detail page — header + roster — from the REAL
 // Supabase read via lib/teams (RLS publishable client). `params` is a Promise in Next 16
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamDetailPage({
   params,
 }: PageProps<"/teams/[slug]">) {
+  if (!TEAMS_ENABLED) notFound(); // dormant for MVP launch
   const { slug } = await params;
   const team = await getTeamBySlug(slug);
   if (!team) notFound();

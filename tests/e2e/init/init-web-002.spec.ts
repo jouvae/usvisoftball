@@ -105,8 +105,8 @@ test.beforeAll(async () => {
 test.describe("init-web-002 — published article renders", () => {
   test("route responds 200 with full article content", async ({ page }) => {
     // 1. HTTP 200 read straight off the navigation response.
-    const res = await page.goto(`/news/${PUBLISHED_SLUG}`);
-    expect(res, `no response for /news/${PUBLISHED_SLUG}`).not.toBeNull();
+    const res = await page.goto(`/articles/${PUBLISHED_SLUG}`);
+    expect(res, `no response for /articles/${PUBLISHED_SLUG}`).not.toBeNull();
     expect(res!.status()).toBe(200);
 
     // 2. The sole <h1> is the headline (asserted via testid AND role).
@@ -140,7 +140,7 @@ test.describe("init-web-002 — published article renders", () => {
   test("gallery renders exactly 2 images, per index, in array order", async ({
     page,
   }) => {
-    await page.goto(`/news/${PUBLISHED_SLUG}`);
+    await page.goto(`/articles/${PUBLISHED_SLUG}`);
 
     // 7. Gallery section present; images scoped under it (strict mode, §4.1).
     const gallery = page.getByTestId("article-gallery");
@@ -161,8 +161,8 @@ test.describe("init-web-002 — published article renders", () => {
 // ===========================================================================
 test.describe("init-web-002 — empty-gallery published article", () => {
   test("renders 200 with no gallery section", async ({ page }) => {
-    const res = await page.goto(`/news/${EMPTY_GALLERY_SLUG}`);
-    expect(res, `no response for /news/${EMPTY_GALLERY_SLUG}`).not.toBeNull();
+    const res = await page.goto(`/articles/${EMPTY_GALLERY_SLUG}`);
+    expect(res, `no response for /articles/${EMPTY_GALLERY_SLUG}`).not.toBeNull();
     expect(res!.status()).toBe(200);
 
     await expect(page.getByTestId("article-headline")).toBeVisible();
@@ -181,12 +181,12 @@ test.describe("init-web-002 — empty-gallery published article", () => {
 // ===========================================================================
 test.describe("init-web-002 — drafts / in_review / unpublished 404 (no leak)", () => {
   for (const { slug, title } of HIDDEN) {
-    test(`/news/${slug} returns 404 and never leaks its title`, async ({
+    test(`/articles/${slug} returns 404 and never leaks its title`, async ({
       page,
     }) => {
       // 9. HTTP 404 (streamed-response-sensitive — read off the response, §8-#2).
-      const res = await page.goto(`/news/${slug}`);
-      expect(res, `no response for /news/${slug}`).not.toBeNull();
+      const res = await page.goto(`/articles/${slug}`);
+      expect(res, `no response for /articles/${slug}`).not.toBeNull();
       expect(res!.status()).toBe(404);
 
       // 10. Leak check: the hidden title appears NOWHERE in the 404 body.
@@ -205,9 +205,9 @@ test.describe("init-web-002 — drafts / in_review / unpublished 404 (no leak)",
   }
 
   // 11. A nonexistent slug also 404s (same non-streamed path).
-  test(`/news/${NONEXISTENT_SLUG} returns 404`, async ({ page }) => {
-    const res = await page.goto(`/news/${NONEXISTENT_SLUG}`);
-    expect(res, `no response for /news/${NONEXISTENT_SLUG}`).not.toBeNull();
+  test(`/articles/${NONEXISTENT_SLUG} returns 404`, async ({ page }) => {
+    const res = await page.goto(`/articles/${NONEXISTENT_SLUG}`);
+    expect(res, `no response for /articles/${NONEXISTENT_SLUG}`).not.toBeNull();
     expect(res!.status()).toBe(404);
     await expect(page.getByTestId("article-not-found")).toBeVisible();
   });
@@ -220,13 +220,13 @@ test.describe("init-web-002 — drafts / in_review / unpublished 404 (no leak)",
 // ===========================================================================
 test.describe("init-web-002 — feed → article navigation", () => {
   test("clicking the card headline link opens the article", async ({ page }) => {
-    await page.goto("/news");
+    await page.goto("/articles");
 
     await cardBySlug(page, PUBLISHED_SLUG)
       .getByTestId("article-card-link")
       .click();
 
-    await expect(page).toHaveURL(new RegExp(`/news/${PUBLISHED_SLUG}$`));
+    await expect(page).toHaveURL(new RegExp(`/articles/${PUBLISHED_SLUG}$`));
     await expect(page.getByTestId("article-headline")).toHaveText(
       PUBLISHED.title,
     );

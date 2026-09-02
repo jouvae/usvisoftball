@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { readOwnProfile } from "@/lib/roles";
-import { AI_DRAFT_ENABLED } from "@/lib/flags";
+import { AI_DRAFT_ENABLED, TEAMS_ENABLED, EVENTS_ENABLED } from "@/lib/flags";
 
 // The minimal dashboard placeholder — the "admin data" marker. It only renders for
 // an authenticated request (the layout guard redirected anyone else), so these
@@ -103,7 +103,7 @@ export default async function AdminDashboardPage() {
           {/* The teams admin screen (teams-e2e-003) is editor-only — same canReview
               gate; every team Server Action re-runs requireRole('editor') and RLS
               re-enforces at the row, so this gate only decides what to render. */}
-          {canReview ? (
+          {canReview && TEAMS_ENABLED ? (
             <Link
               data-testid="admin-teams-link"
               href="/admin/teams"
@@ -115,7 +115,7 @@ export default async function AdminDashboardPage() {
           {/* The events admin screen (events-e2e-003) is editor-only — same canReview
               gate; every event Server Action re-runs requireRole('editor') and RLS
               re-enforces at the row, so this gate only decides what to render. */}
-          {canReview ? (
+          {canReview && EVENTS_ENABLED ? (
             <Link
               data-testid="admin-events-link"
               href="/admin/events"

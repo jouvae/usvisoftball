@@ -68,6 +68,17 @@ async function readRoster(slug: string): Promise<SeedPlayer[]> {
   return (data as SeedPlayer[] | null) ?? [];
 }
 
+// MVP launch: the Teams section is flag-gated OFF (lib/flags.ts). With the flag
+// unset every Teams route returns 404, so these seed-backed specs cannot pass.
+// Skip the whole file unless NEXT_PUBLIC_TEAMS_ENABLED=true — they stay meaningful
+// and are exercised the moment the flag is flipped on.
+test.beforeEach(() => {
+  test.skip(
+    process.env.NEXT_PUBLIC_TEAMS_ENABLED !== "true",
+    "Teams feature flag is OFF for the MVP launch",
+  );
+});
+
 test.describe("teams-web-002 — public team detail renders from seed", () => {
   let frenchtown: SeedPlayer[];
   let crushers: SeedPlayer[];

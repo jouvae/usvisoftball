@@ -46,8 +46,8 @@ export async function publishArticle(
     throw err;
   }
 
-  revalidatePath("/news");
-  revalidatePath(`/news/${published.slug}`);
+  revalidatePath("/articles");
+  revalidatePath(`/articles/${published.slug}`);
   revalidatePath("/admin/queue");
   revalidatePath(`/admin/review/${id}`);
   return undefined;
@@ -85,8 +85,8 @@ export async function unpublishArticle(
     throw err;
   }
 
-  revalidatePath("/news"); // feed loses the card
-  revalidatePath(`/news/${unpublished.slug}`); // public article page now 404s for anon
+  revalidatePath("/articles"); // feed loses the card
+  revalidatePath(`/articles/${unpublished.slug}`); // public article page now 404s for anon
   revalidatePath("/admin/queue"); // queue row's badge flips to Unpublished
   revalidatePath(`/admin/review/${id}`); // review view flips to Unpublished + Re-publish
   return undefined; // no redirect — stay on the review desk

@@ -252,6 +252,17 @@ async function addMarkerPlayer(
   return row!;
 }
 
+// MVP launch: the Teams section is flag-gated OFF (lib/flags.ts). With the flag
+// unset every Teams route returns 404, so these seed-backed specs cannot pass.
+// Skip the whole file unless NEXT_PUBLIC_TEAMS_ENABLED=true — they stay meaningful
+// and are exercised the moment the flag is flipped on.
+test.beforeEach(() => {
+  test.skip(
+    process.env.NEXT_PUBLIC_TEAMS_ENABLED !== "true",
+    "Teams feature flag is OFF for the MVP launch",
+  );
+});
+
 test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz (desktop)", () => {
   test.beforeEach(({}, testInfo) =>
     test.skip(

@@ -214,7 +214,7 @@ test.describe("init-e2e-005 — editor reviews, edits, and publishes (desktop)",
     // THEN: the now-published article appears on the public /news feed. Presence,
     // not count — during this window there are 3 published (the two fixtures + the
     // throwaway); afterAll restores the feed to exactly 2.
-    const feedRes = await page.goto("/news");
+    const feedRes = await page.goto("/articles");
     expect(feedRes, "no response for /news").not.toBeNull();
     expect(feedRes!.status()).toBe(200);
     await expect(
@@ -225,7 +225,7 @@ test.describe("init-e2e-005 — editor reviews, edits, and publishes (desktop)",
 
     // ...and its article page renders with the EDITED body (proves the body edit
     // persisted + rendered, React-escaped).
-    const articleRes = await page.goto(`/news/${seededSlug}`);
+    const articleRes = await page.goto(`/articles/${seededSlug}`);
     expect(articleRes, "no response for the article page").not.toBeNull();
     expect(articleRes!.status()).toBe(200);
     await expect(page.getByTestId("article-headline")).toHaveText(markerTitle);

@@ -19,7 +19,7 @@ export default function ArticleNotFound() {
         published.
       </p>
       <Link
-        href="/news"
+        href="/articles"
         className="font-display font-semibold text-brand hover:text-brand-hover"
       >
         Back to news

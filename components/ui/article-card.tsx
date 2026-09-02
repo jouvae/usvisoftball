@@ -11,7 +11,7 @@ export type ArticleCardProps = {
 };
 
 // One published article. Server Component — nothing here is interactive.
-// The headline is an <h2> wrapping a <Link> to /news/[slug] (slice 03; the route
+// The headline is an <h2> wrapping a <Link> to /articles/[slug] (slice 03; the route
 // now exists). The `article-card-headline` testid STAYS on the <h2> (its
 // accessible name is still the title); a new `article-card-link` testid rides the
 // <Link>. The category eyebrow is a navy-text-on-gold chip (8.13:1, the DESIGN.md
@@ -66,7 +66,7 @@ export function ArticleCard({
         >
           <Link
             data-testid="article-card-link"
-            href={`/news/${slug}`}
+            href={`/articles/${slug}`}
             className="hover:text-brand-hover"
           >
             {title}

@@ -1,5 +1,7 @@
+import { notFound } from "next/navigation";
 import { listEvents, splitEventsByDate, todayISO } from "@/lib/events";
 import { EventsDirectory } from "@/components/ui/events-directory";
+import { EVENTS_ENABLED } from "@/lib/flags";
 
 // DELIVER (events-web-001): the public events directory, from the REAL Supabase read via
 // lib/events (RLS publishable client), split into Upcoming vs Past by end_date relative to
@@ -8,6 +10,7 @@ import { EventsDirectory } from "@/components/ui/events-directory";
 export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
+  if (!EVENTS_ENABLED) notFound(); // dormant for MVP launch
   const events = await listEvents();
   const { upcoming, past } = splitEventsByDate(events, todayISO(new Date()));
 

@@ -19,7 +19,7 @@ const getArticle = cache(getPublishedArticleBySlug);
 
 export async function generateMetadata({
   params,
-}: PageProps<"/news/[slug]">): Promise<Metadata> {
+}: PageProps<"/articles/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const article = await getArticle(slug);
   // A non-published slug returns null through the RLS-enforced read, so a draft's
@@ -35,7 +35,7 @@ export async function generateMetadata({
 // calls notFound() BEFORE returning any JSX — so the shell has not begun streaming
 // and Next emits a real HTTP 404 for a hidden slug (slice-03 §3.1, §8-#2). Roots
 // at <article>, NOT <main>: the layout owns the sole <main> landmark (slice-01 §2).
-export default async function ArticlePage({ params }: PageProps<"/news/[slug]">) {
+export default async function ArticlePage({ params }: PageProps<"/articles/[slug]">) {
   const { slug } = await params;
   const article = await getArticle(slug);
   if (!article) notFound();

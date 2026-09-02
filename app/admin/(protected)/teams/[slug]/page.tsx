@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireRole } from "@/lib/roles";
 import { getTeamBySlug } from "@/lib/teams";
+import { TEAMS_ENABLED } from "@/lib/flags";
 import { PlayerForm } from "@/components/client/player-form";
 import { PlayerDeleteButton } from "@/components/client/player-delete-button";
 import {
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function RosterAdminPage({
   params,
 }: PageProps<"/admin/teams/[slug]">) {
+  if (!TEAMS_ENABLED) notFound(); // dormant for MVP launch
   await requireRole("editor");
 
   const { slug } = await params;

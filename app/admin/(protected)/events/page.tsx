@@ -1,5 +1,7 @@
+import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/roles";
 import { listEvents } from "@/lib/events";
+import { EVENTS_ENABLED } from "@/lib/flags";
 import { EventForm } from "@/components/client/event-form";
 import { EventDeleteButton } from "@/components/client/event-delete-button";
 import {
@@ -16,6 +18,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function EventsAdminPage() {
+  if (!EVENTS_ENABLED) notFound(); // dormant for MVP launch
   await requireRole("editor");
 
   const events = [...(await listEvents())].sort(

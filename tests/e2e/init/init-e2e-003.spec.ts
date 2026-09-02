@@ -196,7 +196,7 @@ test.describe("init-e2e-003 — contributor creates + submits a draft (desktop)"
     const anon = await browser.newContext({ baseURL: BASE_URL });
     try {
       const anonPage = await anon.newPage();
-      const res = await anonPage.goto("/news");
+      const res = await anonPage.goto("/articles");
       expect(res, "no response for /news").not.toBeNull();
       expect(res!.status()).toBe(200);
       await expect(anonPage.getByText(markerTitle)).toHaveCount(0);

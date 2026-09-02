@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavLink } from "@/components/ui/nav-link";
+import { PAYPAL_DONATE_URL } from "@/lib/flags";
 
+// MVP nav: logo (SiteBrand, → home) on the left; Articles · About · Donate on the right.
+// Teams, Events, Shop are dormant for launch (flagged off) and intentionally absent here.
+// Donate is an external CTA to PayPal (opens in a new tab).
 const NAV_ITEMS = [
-  { href: "/news", label: "News", testId: "nav-link-news" },
-  { href: "/teams", label: "Teams", testId: "nav-link-teams" },
-  { href: "/events", label: "Events", testId: "nav-link-events" },
+  { href: "/articles", label: "Articles", testId: "nav-link-articles" },
   { href: "/about", label: "About", testId: "nav-link-about" },
-  { href: "/shop", label: "Shop", testId: "nav-link-shop" },
-  { href: "/donate", label: "Donate", testId: "nav-link-donate" },
 ] as const;
 
 export function PrimaryNav({ className = "" }: { className?: string }) {
@@ -43,11 +43,19 @@ export function PrimaryNav({ className = "" }: { className?: string }) {
             href={item.href}
             label={item.label}
             testId={item.testId}
-            active={pathname === item.href}
-            variant={item.href === "/donate" ? "cta" : "default"}
+            active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
             onNavigate={() => setOpen(false)}
           />
         ))}
+        <NavLink
+          href={PAYPAL_DONATE_URL}
+          label="Donate"
+          testId="nav-link-donate"
+          active={false}
+          variant="cta"
+          external
+          onNavigate={() => setOpen(false)}
+        />
       </nav>
     </>
   );

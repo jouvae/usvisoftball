@@ -26,15 +26,54 @@ one project for determinism against the shared DB), matching the init house styl
 
 import { test, expect, type Page } from "@playwright/test";
 import { SEAT_LABELS } from "@/lib/board";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // ---------------------------------------------------------------------------
-// Seeded contract (migration 0006 + seed:about). Concrete strings so a silently
-// empty roster / broken read RLS cannot pass by tautology.
+// CURRENT-board facts are DERIVED from a live service-key read, not hardcoded:
+// editors change the board through /admin/board, so the roster is live content, not a
+// frozen seed (it once drifted when "Marlene Charles" was replaced by a real President).
+// The beforeAll still fails loudly on an empty roster / broken read, so a silently-empty
+// page can't pass by tautology. Archived-term facts (below) stay hardcoded — an archived
+// term is immutable (0008 permanence guard), so it cannot drift.
 // ---------------------------------------------------------------------------
-const CURRENT_MEMBER_COUNT = 4;
-const KNOWN_CURRENT_MEMBER = "Marlene Charles";
-const NO_PHOTO_MEMBER = "Terrence Gumbs";
-const NO_PHOTO_INITIALS = "TG"; // first letter of the first two words, upper-cased
+let currentCount = 0;
+let knownCurrentMember = "";
+let noPhotoMember: string | null = null;
+let noPhotoInitials = "";
+
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+}
+
+test.beforeAll(async () => {
+  const supabase = createAdminClient();
+  const { data: term } = await supabase
+    .from("board_terms")
+    .select("id")
+    .eq("is_current", true)
+    .maybeSingle();
+  if (!term) throw new Error("no current board term seeded");
+  const { data, error } = await supabase
+    .from("board_members")
+    .select("name, photo_url")
+    .eq("term_id", (term as { id: string }).id)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  const members = (data ?? []) as { name: string; photo_url: string | null }[];
+  if (members.length === 0) throw new Error("current board roster is empty");
+  currentCount = members.length;
+  knownCurrentMember = members[0].name;
+  const noPhoto = members.find((m) => !m.photo_url);
+  if (noPhoto) {
+    noPhotoMember = noPhoto.name;
+    noPhotoInitials = initialsOf(noPhoto.name);
+  }
+});
 
 // Island coverage — the three human seat labels that MUST appear across the
 // current roster (single source of truth is SEAT_LABELS, so test + UI never drift).
@@ -88,12 +127,13 @@ test.describe("about-web-001 — mission + current board roster", () => {
     expect((await mission.innerText()).trim().length).toBeGreaterThan(0);
   });
 
-  test("board roster is visible with exactly 4 member cards", async ({ page }) => {
+  test("board roster is visible with the current member cards", async ({ page }) => {
     const roster = page.getByTestId("about-board-roster");
     await expect(roster).toBeVisible();
-    // 4, not 0: proves the roster is non-empty AND the term selection is correct.
+    // Count matches the live current-term roster (>0): proves non-empty AND correct term.
+    expect(currentCount).toBeGreaterThan(0);
     await expect(roster.getByTestId("board-member-card")).toHaveCount(
-      CURRENT_MEMBER_COUNT,
+      currentCount,
     );
   });
 
@@ -102,7 +142,7 @@ test.describe("about-web-001 — mission + current board roster", () => {
     await expect(
       roster
         .getByTestId("board-member-card")
-        .filter({ hasText: KNOWN_CURRENT_MEMBER }),
+        .filter({ hasText: knownCurrentMember }),
     ).toHaveCount(1);
   });
 });
@@ -121,11 +161,11 @@ test.describe("about-web-002 — island seats + initials fallback", () => {
     const cards = page
       .getByTestId("about-board-roster")
       .getByTestId("board-member-card");
-    await expect(cards).toHaveCount(CURRENT_MEMBER_COUNT);
+    await expect(cards).toHaveCount(currentCount);
     // One seat badge per card — no card is missing its constituency.
     await expect(
       page.getByTestId("about-board-roster").getByTestId("board-member-seat"),
-    ).toHaveCount(CURRENT_MEMBER_COUNT);
+    ).toHaveCount(currentCount);
   });
 
   test("the three island seat labels all appear across the roster", async ({
@@ -150,10 +190,16 @@ test.describe("about-web-002 — island seats + initials fallback", () => {
   test("the no-photo member renders the initials fallback (no <img>)", async ({
     page,
   }) => {
+    // Only meaningful if the live roster currently has a member WITHOUT a photo; editors
+    // may have given everyone a headshot. Skip cleanly rather than assert a stale name.
+    test.skip(
+      noPhotoMember === null,
+      "every current board member currently has a photo",
+    );
     const card = page
       .getByTestId("about-board-roster")
       .getByTestId("board-member-card")
-      .filter({ hasText: NO_PHOTO_MEMBER });
+      .filter({ hasText: noPhotoMember! });
     await expect(card).toHaveCount(1);
 
     // The photo slot exists for every card...
@@ -162,7 +208,7 @@ test.describe("about-web-002 — island seats + initials fallback", () => {
     // ...but for the photoless member it is the navy initials block, NOT a broken
     // <img>: the photoUrl branch is skipped, so no <img> is emitted at all.
     await expect(photo.locator("img")).toHaveCount(0);
-    await expect(photo).toHaveText(NO_PHOTO_INITIALS);
+    await expect(photo).toHaveText(noPhotoInitials);
   });
 });
 

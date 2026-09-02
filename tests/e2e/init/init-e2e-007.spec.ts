@@ -260,7 +260,7 @@ test.describe("init-e2e-007 — AI draft generated for review, never auto-publis
       // Absent from /news: the feed never shows the marker headline. toHaveCount(0)
       // is the auto-retrying absence assertion (article-card scoped, plus a
       // whole-page text sweep as a belt-and-braces leak check).
-      const feedRes = await anonPage.goto("/news");
+      const feedRes = await anonPage.goto("/articles");
       expect(feedRes, "no response for /news").not.toBeNull();
       expect(feedRes!.status()).toBe(200);
       await expect(
@@ -274,7 +274,7 @@ test.describe("init-e2e-007 — AI draft generated for review, never auto-publis
       // persisted (slice-09 §5.4 step 4).
       const slug = slugify(generatedTitle);
       expect(slug, "derived a non-empty slug from the generated title").toBeTruthy();
-      const draftRes = await anonPage.goto(`/news/${slug}`);
+      const draftRes = await anonPage.goto(`/articles/${slug}`);
       expect(draftRes, `no response for /news/${slug}`).not.toBeNull();
       expect(draftRes!.status()).toBe(404);
       await expect(anonPage.getByTestId("article-not-found")).toBeVisible();

@@ -6,6 +6,7 @@ import {
   formatEventDateRange,
   safeEventLogoHref,
 } from "@/lib/events";
+import { EVENTS_ENABLED } from "@/lib/flags";
 
 // Event island labels reuse the shared taxonomy; team islands render the same way.
 function islandLabel(island: string | null): string {
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function EventDetailPage({
   params,
 }: PageProps<"/events/[slug]">) {
+  if (!EVENTS_ENABLED) notFound(); // dormant for MVP launch
   const { slug } = await params;
   const event = await getEventBySlug(slug);
   if (!event) notFound();

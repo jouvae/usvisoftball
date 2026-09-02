@@ -1,5 +1,7 @@
+import { notFound } from "next/navigation";
 import { listTeams, groupTeamsByIsland } from "@/lib/teams";
 import { TeamsDirectory } from "@/components/ui/teams-directory";
+import { TEAMS_ENABLED } from "@/lib/flags";
 
 // DELIVER (teams-web-001): the public teams directory, rendered from the REAL Supabase
 // read via lib/teams (RLS-enforced publishable client), grouped by island. force-dynamic:
@@ -8,6 +10,7 @@ import { TeamsDirectory } from "@/components/ui/teams-directory";
 export const dynamic = "force-dynamic";
 
 export default async function TeamsPage() {
+  if (!TEAMS_ENABLED) notFound(); // dormant for MVP launch
   const teams = await listTeams();
   const groups = groupTeamsByIsland(teams);
 

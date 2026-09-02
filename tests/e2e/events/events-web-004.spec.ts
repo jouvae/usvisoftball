@@ -68,7 +68,7 @@ async function readParticipants(eventSlug: string): Promise<Participant[]> {
     .order("sort_order", { ascending: true });
   if (error) throw error;
 
-  return ((data as ParticipantRow[] | null) ?? []).map((r) => {
+  return ((data as unknown as ParticipantRow[] | null) ?? []).map((r) => {
     if (!r.teams) throw new Error("event_teams row missing joined team");
     return { name: r.teams.name, slug: r.teams.slug };
   });
@@ -76,6 +76,17 @@ async function readParticipants(eventSlug: string): Promise<Participant[]> {
 
 const CUP_SLUG = "sample-inter-island-cup";
 const CHAMP_SLUG = "sample-territorial-championship";
+
+// MVP launch: the Events section is flag-gated OFF (lib/flags.ts). With the flag
+// unset every Events route returns 404, so these seed-backed specs cannot pass.
+// Skip the whole file unless NEXT_PUBLIC_EVENTS_ENABLED=true — they stay meaningful
+// and are exercised the moment the flag is flipped on.
+test.beforeEach(() => {
+  test.skip(
+    process.env.NEXT_PUBLIC_EVENTS_ENABLED !== "true",
+    "Events feature flag is OFF for the MVP launch",
+  );
+});
 
 test.describe("events-web-004 — public event participating-teams renders from seed", () => {
   let cup: Participant[];

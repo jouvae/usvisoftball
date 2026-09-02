@@ -231,6 +231,17 @@ async function createMarkerEvent(
   return row!;
 }
 
+// MVP launch: the Events section is flag-gated OFF (lib/flags.ts). With the flag
+// unset every Events route returns 404, so these seed-backed specs cannot pass.
+// Skip the whole file unless NEXT_PUBLIC_EVENTS_ENABLED=true — they stay meaningful
+// and are exercised the moment the flag is flipped on.
+test.beforeEach(() => {
+  test.skip(
+    process.env.NEXT_PUBLIC_EVENTS_ENABLED !== "true",
+    "Events feature flag is OFF for the MVP launch",
+  );
+});
+
 test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + reap + authz (desktop)", () => {
   test.beforeEach(({}, testInfo) =>
     test.skip(

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/roles";
 import { listTeams } from "@/lib/teams";
+import { TEAMS_ENABLED } from "@/lib/flags";
 import { TeamForm } from "@/components/client/team-form";
 import { TeamDeleteButton } from "@/components/client/team-delete-button";
 import {
@@ -17,6 +19,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function TeamsAdminPage() {
+  if (!TEAMS_ENABLED) notFound(); // dormant for MVP launch
   await requireRole("editor");
 
   const teams = await listTeams();

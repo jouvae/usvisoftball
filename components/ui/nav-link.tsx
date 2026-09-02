@@ -6,6 +6,7 @@ export type NavLinkProps = {
   testId: string;
   active: boolean;
   variant?: "default" | "cta";
+  external?: boolean;
   onNavigate?: () => void;
   className?: string;
 };
@@ -16,6 +17,7 @@ export function NavLink({
   testId,
   active,
   variant = "default",
+  external = false,
   onNavigate,
   className = "",
 }: NavLinkProps) {
@@ -28,6 +30,23 @@ export function NavLink({
       : active
         ? "text-header-foreground border-b-2 border-accent"
         : "text-header-muted hover:text-header-foreground";
+
+  // External links (e.g. the PayPal Donate button) open in a new tab as a plain anchor;
+  // internal links use next/link for client routing.
+  if (external) {
+    return (
+      <a
+        href={href}
+        data-testid={testId}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onNavigate}
+        className={`${base} ${variantClass} ${className}`}
+      >
+        {label}
+      </a>
+    );
+  }
 
   return (
     <Link

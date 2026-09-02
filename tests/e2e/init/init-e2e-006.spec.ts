@@ -192,14 +192,14 @@ test.describe("init-e2e-006 — editor unpublishes a live article (desktop)", ()
     //    Presence, not count — during this window there are 3 published (the two
     //    fixtures + the throwaway); afterAll restores the feed to exactly 2.
     // ---------------------------------------------------------------------
-    const feedResBefore = await page.goto("/news");
+    const feedResBefore = await page.goto("/articles");
     expect(feedResBefore, "no response for /news").not.toBeNull();
     expect(feedResBefore!.status()).toBe(200);
     await expect(
       page.locator(`[data-testid="article-card"][data-slug="${seededSlug}"]`),
     ).toHaveCount(1);
 
-    const articleResBefore = await page.goto(`/news/${seededSlug}`);
+    const articleResBefore = await page.goto(`/articles/${seededSlug}`);
     expect(articleResBefore, "no response for the article page").not.toBeNull();
     expect(articleResBefore!.status()).toBe(200);
     await expect(page.getByTestId("article-headline")).toHaveText(markerTitle);
@@ -262,7 +262,7 @@ test.describe("init-e2e-006 — editor unpublishes a live article (desktop)", ()
     try {
       const anonPage = await anon.newPage();
 
-      const anonFeedRes = await anonPage.goto("/news");
+      const anonFeedRes = await anonPage.goto("/articles");
       expect(anonFeedRes, "no response for anon /news").not.toBeNull();
       expect(anonFeedRes!.status()).toBe(200);
       await expect(
@@ -271,7 +271,7 @@ test.describe("init-e2e-006 — editor unpublishes a live article (desktop)", ()
         ),
       ).toHaveCount(0);
 
-      const anonSlugRes = await anonPage.goto(`/news/${seededSlug}`);
+      const anonSlugRes = await anonPage.goto(`/articles/${seededSlug}`);
       expect(anonSlugRes, "no response for the anon article page").not.toBeNull();
       expect(anonSlugRes!.status()).toBe(404);
       await expect(anonPage.getByTestId("article-not-found")).toBeVisible();
@@ -315,7 +315,7 @@ test.describe("init-e2e-006 — editor unpublishes a live article (desktop)", ()
     const anonAfter = await browser.newContext({ baseURL: BASE_URL });
     try {
       const anonAfterPage = await anonAfter.newPage();
-      const res = await anonAfterPage.goto("/news");
+      const res = await anonAfterPage.goto("/articles");
       expect(res, "no response for anon /news (re-publish)").not.toBeNull();
       expect(res!.status()).toBe(200);
       await expect(

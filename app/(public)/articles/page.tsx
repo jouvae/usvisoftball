@@ -22,7 +22,7 @@ export default async function NewsPage() {
       ) : (
         <>
           <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
-            News
+            Articles
           </h1>
           <ArticleFeed articles={articles} />
         </>

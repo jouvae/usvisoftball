@@ -70,6 +70,17 @@ async function readEvent(slug: string): Promise<EventRow> {
 const CHAMP_SLUG = "sample-territorial-championship";
 const NULL_ISLAND_SLUG = "sample-inter-island-cup";
 
+// MVP launch: the Events section is flag-gated OFF (lib/flags.ts). With the flag
+// unset every Events route returns 404, so these seed-backed specs cannot pass.
+// Skip the whole file unless NEXT_PUBLIC_EVENTS_ENABLED=true — they stay meaningful
+// and are exercised the moment the flag is flipped on.
+test.beforeEach(() => {
+  test.skip(
+    process.env.NEXT_PUBLIC_EVENTS_ENABLED !== "true",
+    "Events feature flag is OFF for the MVP launch",
+  );
+});
+
 test.describe("events-web-002 — public event detail renders from seed", () => {
   let champ: EventRow;
   let nullIsland: EventRow;

@@ -14,7 +14,7 @@ references:
 ---
 
 ## Given
-Published articles exist and an unauthenticated visitor opens `/news`.
+Published articles exist and an unauthenticated visitor opens `/articles`.
 
 ## When
 The feed loads.
@@ -102,9 +102,9 @@ test.describe("init-web-001 — published feed, newest first", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    // WHEN: an unauthenticated visitor opens /news and the feed loads.
-    const res = await page.goto("/news");
-    expect(res, "no response for /news").not.toBeNull();
+    // WHEN: an unauthenticated visitor opens /articles and the feed loads.
+    const res = await page.goto("/articles");
+    expect(res, "no response for /articles").not.toBeNull();
     expect(res!.status()).toBe(200);
   });
 
@@ -199,8 +199,8 @@ test.describe("init-web-001 — empty state (desktop-only, mutating)", () => {
     await deleteAllArticles();
 
     try {
-      const res = await page.goto("/news");
-      expect(res, "no response for /news").not.toBeNull();
+      const res = await page.goto("/articles");
+      expect(res, "no response for /articles").not.toBeNull();
       expect(res!.status()).toBe(200); // a normal state, never a thrown error
 
       await expect(page.getByTestId("news-empty-state")).toBeVisible();

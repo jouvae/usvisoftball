@@ -80,7 +80,7 @@ export default async function ReviewPage({
           </div>
           <Link
             data-testid="review-live-link"
-            href={`/news/${article.slug}`}
+            href={`/articles/${article.slug}`}
             className="w-fit font-medium text-brand underline outline-focus hover:text-brand-hover focus:outline-2"
           >
             View the live article

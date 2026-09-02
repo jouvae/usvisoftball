@@ -11,3 +11,18 @@
 // the Playwright suite (init-e2e-007) exercise the panel.
 export const AI_DRAFT_ENABLED =
   process.env.NEXT_PUBLIC_AI_DRAFT_ENABLED === "true";
+
+// Teams/players and Events are built + data-preserved but DORMANT for the MVP launch.
+// Same semantics as AI_DRAFT_ENABLED: enabled ONLY when the value is exactly "true";
+// unset (prod default) = OFF → the routes 404 and the nav links are hidden. The DB tables
+// (teams, team_players, event_teams, events) are untouched — flip a flag to bring the
+// section back with no data migration.
+export const TEAMS_ENABLED =
+  process.env.NEXT_PUBLIC_TEAMS_ENABLED === "true";
+export const EVENTS_ENABLED =
+  process.env.NEXT_PUBLIC_EVENTS_ENABLED === "true";
+
+// The Donate button (nav) links out to PayPal. Hardcoded (not env) so it survives the
+// env-free Fly build, like next.config's Storage host. TODO: swap PAYPAL_DONATE_URL for
+// the Federation's real PayPal donate link (paypal.me handle or hosted Donate button URL).
+export const PAYPAL_DONATE_URL = "https://www.paypal.com/donate";

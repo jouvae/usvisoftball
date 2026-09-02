@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
   // Fly.io deploy shape. Combined with self-hosted fonts, the build needs no
   // network access.
   output: "standalone",
+  // The news section became the article-first home + /articles. Keep old links working.
+  async redirects() {
+    return [
+      { source: "/news", destination: "/articles", permanent: true },
+      { source: "/news/:slug", destination: "/articles/:slug", permanent: true },
+    ];
+  },
   // Raise the Server-Action body cap above the app's 2 MB photo limit (+ multipart
   // overhead) so lib/board-photos.ts's own 2 MB check — with its FRIENDLY form error — is
   // the effective boundary. The framework default is 1 MB, which would otherwise reject a
