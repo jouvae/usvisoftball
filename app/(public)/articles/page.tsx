@@ -1,5 +1,5 @@
 import { listPublishedArticles } from "@/lib/articles";
-import { ArticleFeed } from "@/components/ui/article-feed";
+import { ArticlesBrowser } from "@/components/client/articles-browser";
 import { EmptyState } from "@/components/ui/empty-state";
 
 // The feed is DB-backed, mutable data read via supabase-js (NOT `fetch`, so Next's
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // Server Component: awaits the DB read (06-fetching-data.md §"With an ORM or
 // database" — credentials/query stay server-side). Roots at <section>, NOT <main>:
 // the layout owns the sole <main> landmark (slice-01 §2).
-export default async function NewsPage() {
+export default async function ArticlesPage() {
   const articles = await listPublishedArticles();
 
   return (
@@ -24,7 +24,7 @@ export default async function NewsPage() {
           <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
             Articles
           </h1>
-          <ArticleFeed articles={articles} />
+          <ArticlesBrowser articles={articles} />
         </>
       )}
     </section>
