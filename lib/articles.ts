@@ -162,6 +162,29 @@ export async function listPublishedArticles(): Promise<ArticleListItem[]> {
 }
 
 // ---------------------------------------------------------------------------
+// The "continue reading" feed at the bottom of an article detail page (MVP slice 3).
+// Every OTHER published article, newest-first, EXCLUDING the one being read. Same
+// RLS-enforced public client + `.eq('status','published')` convenience filter as
+// listPublishedArticles; the exclusion happens at the DB (`.neq('id', …)`) so the
+// current article can never appear in its own continued feed. Returns [] when there
+// are no other published articles (NOT an error) — the page then omits the section.
+// ---------------------------------------------------------------------------
+export async function listPublishedArticlesExcept(
+  excludeId: string,
+): Promise<ArticleListItem[]> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("articles")
+    .select(LIST_COLUMNS)
+    .eq("status", "published")
+    .neq("id", excludeId)
+    .order("published_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => toListItem(row as ArticleListRow));
+}
+
+// ---------------------------------------------------------------------------
 // Public by-slug read path (slice-03 §2.1). Reads through the RLS-ENFORCED
 // publishable client — the SAME boundary as listPublishedArticles — so a broken
 // policy fails the tests rather than being masked. DELIBERATELY has NO

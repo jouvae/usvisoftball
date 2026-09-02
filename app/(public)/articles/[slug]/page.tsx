@@ -1,11 +1,15 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getPublishedArticleBySlug } from "@/lib/articles";
+import {
+  getPublishedArticleBySlug,
+  listPublishedArticlesExcept,
+} from "@/lib/articles";
 import { formatArticleDate } from "@/lib/format";
 import { ArticleHero } from "@/components/ui/article-hero";
 import { ArticleBody } from "@/components/ui/article-body";
 import { ArticleGallery } from "@/components/ui/article-gallery";
+import { ArticleFeed } from "@/components/ui/article-feed";
 
 // The article is DB-backed, mutable data read via supabase-js (NOT `fetch`, so
 // Next's fetch cache does not track it). Force per-request rendering so the page
@@ -40,8 +44,14 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
   const article = await getArticle(slug);
   if (!article) notFound();
 
+  // The continued feed: every OTHER published article, newest-first, excluding this
+  // one (MVP slice 3). Excluded at the DB, so it can never list itself. Section is
+  // omitted entirely when this is the only published article.
+  const more = await listPublishedArticlesExcept(article.id);
+
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-12">
+    <div className="flex flex-1 flex-col">
+      <article className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-12">
       <header className="flex flex-col gap-4">
         <span
           data-testid="article-category"
@@ -82,6 +92,21 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
       <ArticleBody body={article.body} />
 
       <ArticleGallery images={article.gallery} />
-    </article>
+      </article>
+
+      {more.length > 0 ? (
+        <section
+          data-testid="article-continued-feed"
+          className="border-t border-border bg-surface"
+        >
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-12">
+            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+              More stories
+            </h2>
+            <ArticleFeed articles={more} />
+          </div>
+        </section>
+      ) : null}
+    </div>
   );
 }
