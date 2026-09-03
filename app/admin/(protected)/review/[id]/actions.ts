@@ -6,10 +6,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   publishArticle as publishArticleRow,
   unpublishArticle as unpublishArticleRow,
+  setArticleHighlight as setArticleHighlightRow,
 } from "@/lib/articles";
 
 export type PublishArticleState = { error: string } | undefined;
 export type UnpublishArticleState = { error: string } | undefined;
+export type SetHighlightState = { error: string } | undefined;
 
 // publishArticle — bound via `publishArticle.bind(null, id)` so the id is a
 // server-closure reference, not a forgeable field (server-actions.md §Security). A
@@ -90,4 +92,39 @@ export async function unpublishArticle(
   revalidatePath("/admin/queue"); // queue row's badge flips to Unpublished
   revalidatePath(`/admin/review/${id}`); // review view flips to Unpublished + Re-publish
   return undefined; // no redirect — stay on the review desk
+}
+
+// setHighlight — bound via `setHighlight.bind(null, id, next)` so BOTH the id and the
+// desired next value are server-closure references, not forgeable fields. The NEXT
+// value is computed server-side from the current row (!isHighlight) at render, so the
+// mutator never read-then-writes → no lost-update race. Like the others, this Server
+// Action is an independently-reachable POST endpoint, so it re-verifies the editor role
+// itself (requireRole) — RLS `articles_editor_update` is the real boundary. Carries no
+// untrusted body (a pure boolean set), so there is nothing to validate; the write runs
+// through the SESSION client so RLS enforces as the editor. A non-editor-visible or
+// missing id matches 0 rows → `.single()` throws PGRST116, caught and returned as
+// { error }. On success, revalidate the home (carousel gains/loses the card) and the
+// review desk (the toggle label flips) BEFORE returning — no redirect.
+export async function setHighlight(
+  id: string,
+  next: boolean,
+  _prevState: SetHighlightState,
+): Promise<SetHighlightState> {
+  await requireRole("editor");
+
+  const supabase = await createSupabaseServerClient();
+
+  try {
+    await setArticleHighlightRow(id, next, supabase);
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === "PGRST116") {
+      return { error: "Could not update the highlight." };
+    }
+    throw err;
+  }
+
+  revalidatePath("/"); // home highlights carousel gains/loses this card
+  revalidatePath(`/admin/review/${id}`); // toggle label + state line flip
+  return undefined;
 }

@@ -6,7 +6,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ArticleStatusBadge } from "@/components/ui/article-status-badge";
 import { PublishArticleForm } from "@/components/client/publish-article-form";
 import { UnpublishArticleForm } from "@/components/client/unpublish-article-form";
-import { publishArticle, unpublishArticle } from "./actions";
+import { HighlightToggleForm } from "@/components/client/highlight-toggle-form";
+import { publishArticle, unpublishArticle, setHighlight } from "./actions";
 
 // The DB row is mutable and read via the cookie session client, so force
 // per-request rendering — the status badge must reflect the live row after a publish
@@ -85,6 +86,15 @@ export default async function ReviewPage({
           >
             View the live article
           </Link>
+          {/*
+            Highlight toggle — only offered on a PUBLISHED row (only published
+            highlights surface on the home). The next value is bound server-side as
+            !current, so the button flips the flag with no client-read race.
+          */}
+          <HighlightToggleForm
+            action={setHighlight.bind(null, id, !article.isHighlight)}
+            isHighlight={article.isHighlight}
+          />
           <UnpublishArticleForm action={unpublishArticle.bind(null, id)} />
         </>
       ) : null}

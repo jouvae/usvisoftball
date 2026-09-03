@@ -45,6 +45,7 @@ export interface Article {
   updatedAt: string; // ISO 8601 (UTC)
   gallery: GalleryImage[]; // never null; DB default '[]'
   aiProvenance: AiProvenance | null; // { source, model } when source=ai; null otherwise
+  isHighlight: boolean; // MVP slice 4: editor-curated home highlight; DB default false
 }
 
 // Exactly the fields the feed card renders — keeps the payload minimal and makes
@@ -104,6 +105,7 @@ interface ArticleRow extends ArticleListRow {
   updated_at: string;
   gallery: GalleryImage[] | null;
   ai_provenance: AiProvenance | null;
+  is_highlight: boolean;
 }
 
 const LIST_COLUMNS =
@@ -112,7 +114,7 @@ const LIST_COLUMNS =
 // The FULL column set for the by-slug detail read (slice-03 §2.1). Explicit —
 // so it is obvious `gallery` is included — mirroring LIST_COLUMNS' discipline.
 const ARTICLE_COLUMNS =
-  "id, title, slug, excerpt, cover_image_url, cover_image_alt, author_name, category, published_at, body, status, source, created_at, updated_at, gallery, ai_provenance";
+  "id, title, slug, excerpt, cover_image_url, cover_image_alt, author_name, category, published_at, body, status, source, created_at, updated_at, gallery, ai_provenance, is_highlight";
 
 function toListItem(row: ArticleListRow): ArticleListItem {
   return {
@@ -140,6 +142,8 @@ function toArticle(row: ArticleRow): Article {
     gallery: row.gallery ?? [],
     // Nullable jsonb — null for every human/pre-AI row (slice-09 §4).
     aiProvenance: row.ai_provenance ?? null,
+    // NOT-NULL boolean column (0020); DB default false guarantees a real bool.
+    isHighlight: row.is_highlight ?? false,
   };
 }
 
@@ -155,6 +159,26 @@ export async function listPublishedArticles(): Promise<ArticleListItem[]> {
     .from("articles")
     .select(LIST_COLUMNS)
     .eq("status", "published")
+    .order("published_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => toListItem(row as ArticleListRow));
+}
+
+// ---------------------------------------------------------------------------
+// The home highlights carousel (MVP slice 4). Editor-curated: published rows the
+// editor flagged `is_highlight`, newest-first. Same RLS-enforced public client +
+// `.eq('status','published')` boundary as the feed; `.eq('is_highlight', true)` is
+// the curation filter. Returns [] when nothing is highlighted (the home page then
+// omits the carousel) — NOT an error.
+// ---------------------------------------------------------------------------
+export async function listHighlightedArticles(): Promise<ArticleListItem[]> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("articles")
+    .select(LIST_COLUMNS)
+    .eq("status", "published")
+    .eq("is_highlight", true)
     .order("published_at", { ascending: false });
 
   if (error) throw error;
@@ -383,6 +407,30 @@ export async function publishArticle(
   const { data, error } = await supabase
     .from("articles")
     .update(patch)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw error; // PGRST116 on 0 rows — caught in the Server Action
+  return toArticle(data as ArticleRow);
+}
+
+// The highlight toggle mutator (MVP slice 4). Injected client => RLS-enforced by
+// articles_editor_update (has_role editor). Sets ONLY is_highlight to the desired
+// value — the NEXT value is passed by the caller (bound from !current), never read-
+// then-written here, so there is no lost-update race. Touches no other column. No
+// `.eq('status', …)` guard: RLS is the boundary and an editor may flag any editor-
+// visible row (a draft may be pre-flagged; it only surfaces once published). `.single()`
+// throws PostgrestError 'PGRST116' on 0 rows (RLS denied — caller is not really an
+// editor — or a missing id); the setHighlight Server Action MUST catch it → { error }.
+export async function setArticleHighlight(
+  id: string,
+  isHighlight: boolean,
+  supabase: SupabaseClient,
+): Promise<Article> {
+  const { data, error } = await supabase
+    .from("articles")
+    .update({ is_highlight: isHighlight })
     .eq("id", id)
     .select("*")
     .single();
