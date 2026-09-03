@@ -7,10 +7,13 @@ import {
   type BoardSeat,
   type BoardTerm,
   type BoardMember,
+  type BoardSocialPlatform,
   type Mission,
   type BoardRoster,
   SEAT_LABELS,
   ABOUT_MISSION_SLUG,
+  BOARD_SOCIAL_HOSTS,
+  BOARD_SOCIAL_LABELS,
 } from "@/lib/board-view";
 
 // Re-export the client-safe view types + constants so existing server callers keep
@@ -27,6 +30,46 @@ export {
   SEAT_LABELS,
   ABOUT_MISSION_SLUG,
 };
+
+// A social URL failed the https + host-allowlist check. Distinct type so the board
+// Server Actions map it to a friendly form error rather than a 500 (mirrors
+// lib/contact.ts ContactUrlError). Editor-supplied social links are rendered as public
+// <a href>, so this is defense-in-depth against javascript:/data:/open-redirect at write.
+export class BoardSocialUrlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BoardSocialUrlError";
+  }
+}
+
+// Write-side validator: an optional (''/null) link is fine; a present one MUST be https on
+// the platform's allowlisted host. Throws BoardSocialUrlError otherwise. The render path is
+// independently guarded by safeBoardSocialHref (lib/board-view), so a value that bypassed
+// this (raw PostgREST) still cannot emit a live off-platform/js: link.
+export function assertBoardSocialUrlAllowed(
+  url: string | null | undefined,
+  platform: BoardSocialPlatform,
+): void {
+  if (!url) return;
+  const label = BOARD_SOCIAL_LABELS[platform];
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new BoardSocialUrlError(`${label} must be a full https:// URL.`);
+  }
+  if (u.protocol !== "https:") {
+    throw new BoardSocialUrlError(`${label} must start with https://.`);
+  }
+  if (u.username || u.password) {
+    throw new BoardSocialUrlError(`${label} must not contain a username or password.`);
+  }
+  if (!BOARD_SOCIAL_HOSTS[platform].includes(u.host)) {
+    throw new BoardSocialUrlError(
+      `${label} must be a ${BOARD_SOCIAL_HOSTS[platform][0]} URL.`,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Feature softball/about — Model + data access (Node 1 contract).
@@ -61,6 +104,12 @@ export interface UpdateBoardMemberFields {
   role?: string;
   photoUrl?: string | null;
   bio?: string;
+  // MVP slice 5 socials. A key present with '' / null CLEARS that link; an OMITTED key
+  // leaves the column untouched (matches the photoUrl `"x" in fields` discipline below).
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
+  linkedinUrl?: string | null;
+  xUrl?: string | null;
   sortOrder?: number;
 }
 
@@ -85,6 +134,10 @@ export interface CreateBoardMemberInput {
   role: string;
   photoUrl?: string | null;
   bio?: string;
+  facebookUrl?: string | null; // MVP slice 5; omitted → null at the DB
+  instagramUrl?: string | null;
+  linkedinUrl?: string | null;
+  xUrl?: string | null;
   sortOrder?: number; // defaults to 0 at the DB
 }
 
@@ -117,6 +170,10 @@ interface BoardMemberRow {
   role: string;
   photo_url: string | null;
   bio: string;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  linkedin_url: string | null;
+  x_url: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -125,7 +182,7 @@ interface BoardMemberRow {
 const TERM_COLUMNS =
   "id, slug, label, is_current, sort_order, created_at, updated_at";
 const MEMBER_COLUMNS =
-  "id, term_id, name, seat, role, photo_url, bio, sort_order, created_at, updated_at";
+  "id, term_id, name, seat, role, photo_url, bio, facebook_url, instagram_url, linkedin_url, x_url, sort_order, created_at, updated_at";
 const MISSION_COLUMNS = "slug, title, body, updated_at";
 
 function toMission(row: SiteContentRow): Mission {
@@ -158,6 +215,12 @@ function toMember(row: BoardMemberRow): BoardMember {
     role: row.role,
     photoUrl: row.photo_url,
     bio: row.bio,
+    socials: {
+      facebook: row.facebook_url,
+      instagram: row.instagram_url,
+      linkedin: row.linkedin_url,
+      x: row.x_url,
+    },
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -327,6 +390,11 @@ export async function createBoardMember(
   // /public path nor an allowlisted host, BEFORE it reaches the DB. Seed fixtures use
   // local /seed/*.png paths, so they pass unchanged.
   assertBoardPhotoUrlAllowed(input.photoUrl);
+  // Social links: https + per-platform host allowlist before the DB write (slice 5).
+  assertBoardSocialUrlAllowed(input.facebookUrl, "facebook");
+  assertBoardSocialUrlAllowed(input.instagramUrl, "instagram");
+  assertBoardSocialUrlAllowed(input.linkedinUrl, "linkedin");
+  assertBoardSocialUrlAllowed(input.xUrl, "x");
 
   const { data, error } = await supabase
     .from("board_members")
@@ -337,6 +405,10 @@ export async function createBoardMember(
       role: input.role,
       photo_url: input.photoUrl ?? null,
       bio: input.bio ?? "",
+      facebook_url: input.facebookUrl ?? null,
+      instagram_url: input.instagramUrl ?? null,
+      linkedin_url: input.linkedinUrl ?? null,
+      x_url: input.xUrl ?? null,
       sort_order: input.sortOrder ?? 0,
     })
     .select(MEMBER_COLUMNS)
@@ -461,6 +533,11 @@ export async function updateBoardMember(
   if ("photoUrl" in fields) {
     assertBoardPhotoUrlAllowed(fields.photoUrl);
   }
+  // Validate any social link the PATCH actually carries (present key), before the write.
+  if ("facebookUrl" in fields) assertBoardSocialUrlAllowed(fields.facebookUrl, "facebook");
+  if ("instagramUrl" in fields) assertBoardSocialUrlAllowed(fields.instagramUrl, "instagram");
+  if ("linkedinUrl" in fields) assertBoardSocialUrlAllowed(fields.linkedinUrl, "linkedin");
+  if ("xUrl" in fields) assertBoardSocialUrlAllowed(fields.xUrl, "x");
 
   const patch: Record<string, unknown> = {};
   if (fields.name !== undefined) patch.name = fields.name;
@@ -468,6 +545,11 @@ export async function updateBoardMember(
   if (fields.role !== undefined) patch.role = fields.role;
   if ("photoUrl" in fields) patch.photo_url = fields.photoUrl ?? null;
   if (fields.bio !== undefined) patch.bio = fields.bio;
+  // A present social key writes its value (''/null clears the column).
+  if ("facebookUrl" in fields) patch.facebook_url = fields.facebookUrl || null;
+  if ("instagramUrl" in fields) patch.instagram_url = fields.instagramUrl || null;
+  if ("linkedinUrl" in fields) patch.linkedin_url = fields.linkedinUrl || null;
+  if ("xUrl" in fields) patch.x_url = fields.xUrl || null;
   if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;
 
   const { data, error } = await supabase

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { listHighlightedArticles } from "@/lib/articles";
+import { listCurrentBoard } from "@/lib/board";
 import { ArticleCard } from "@/components/ui/article-card";
 import { HighlightsCarousel } from "@/components/client/highlights-carousel";
+import { BoardGrid } from "@/components/client/board-grid";
 
 // The home page reads editor-curated highlights from the DB via supabase-js (NOT
 // `fetch`), so force per-request rendering — the carousel must reflect the live set
@@ -14,6 +16,7 @@ export const dynamic = "force-dynamic";
 // highlighted; the "view all" link always shows so the home always routes to /articles.
 export default async function Home() {
   const highlights = await listHighlightedArticles();
+  const board = await listCurrentBoard();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -59,6 +62,29 @@ export default async function Home() {
           </p>
         )}
       </section>
+
+      {board && board.members.length > 0 ? (
+        <section
+          data-testid="home-board"
+          className="border-t border-border bg-surface"
+        >
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-16">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+                Our Board
+              </h2>
+              <Link
+                href="/about"
+                data-testid="home-board-about-link"
+                className="w-fit font-display font-semibold text-brand underline outline-focus hover:text-brand-hover focus:outline-2"
+              >
+                About the Federation
+              </Link>
+            </div>
+            <BoardGrid members={board.members} />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

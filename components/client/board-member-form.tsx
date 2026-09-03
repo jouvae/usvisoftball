@@ -1,7 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { SEAT_LABELS, type BoardMember } from "@/lib/board-view";
+import {
+  SEAT_LABELS,
+  BOARD_SOCIAL_PLATFORMS,
+  BOARD_SOCIAL_LABELS,
+  BOARD_SOCIAL_HOSTS,
+  type BoardMember,
+} from "@/lib/board-view";
 import type { BoardMemberActionState } from "@/app/admin/(protected)/board/actions";
 
 // The board-member form island (about-e2e-005). ONE island serves BOTH add and edit:
@@ -145,6 +151,25 @@ export function BoardMemberForm({
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>
+
+      {/* Social links (slice 5). Each optional; the Server Action validates https + the
+          platform host before write, and the field name is `<platform>Url`. */}
+      {BOARD_SOCIAL_PLATFORMS.map((platform) => (
+        <label
+          key={platform}
+          className="flex flex-col gap-1 text-sm font-medium text-foreground"
+        >
+          {BOARD_SOCIAL_LABELS[platform]} URL
+          <input
+            type="url"
+            name={`${platform}Url`}
+            placeholder={`https://${BOARD_SOCIAL_HOSTS[platform][0]}/…`}
+            defaultValue={member?.socials?.[platform] ?? ""}
+            data-testid={`member-social-${platform}`}
+            className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+          />
+        </label>
+      ))}
 
       <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
         Sort order

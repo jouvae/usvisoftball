@@ -11,10 +11,12 @@ import {
   rollBoardTerm,
   getBoardMemberPhotoUrl,
   BoardPhotoUrlError,
+  BoardSocialUrlError,
   SEAT_LABELS,
   type BoardSeat,
   type UpdateBoardMemberFields,
 } from "@/lib/board";
+import { BOARD_SOCIAL_PLATFORMS } from "@/lib/board-view";
 import {
   uploadBoardPhoto,
   deleteBoardPhotoByUrl,
@@ -104,6 +106,29 @@ export async function updateMissionAction(
   return undefined;
 }
 
+// Read the four social-link fields (facebookUrl / instagramUrl / linkedinUrl / xUrl) from
+// the untrusted FormData, trimmed. '' means "no link" — the lib validator skips empties and
+// the update path clears the column. Driven by BOARD_SOCIAL_PLATFORMS so the form, the DB
+// columns, and this parse never drift.
+function readSocialsFromForm(formData: FormData): {
+  facebookUrl: string;
+  instagramUrl: string;
+  linkedinUrl: string;
+  xUrl: string;
+} {
+  return Object.fromEntries(
+    BOARD_SOCIAL_PLATFORMS.map((p) => [
+      `${p}Url`,
+      String(formData.get(`${p}Url`) ?? "").trim(),
+    ]),
+  ) as {
+    facebookUrl: string;
+    instagramUrl: string;
+    linkedinUrl: string;
+    xUrl: string;
+  };
+}
+
 // createBoardMemberAction (about-e2e-005): add a member to the CURRENT term. The
 // term id is bound server-side (page passes the current term's id), so it is a
 // closure reference, never a forgeable field.
@@ -139,13 +164,17 @@ export async function createBoardMemberAction(
     if (err instanceof BoardPhotoUploadError) return { error: err.message };
     throw err;
   }
+  const socials = readSocialsFromForm(formData);
   try {
     await createBoardMember(
-      { termId, name, seat, role, photoUrl, bio, sortOrder },
+      { termId, name, seat, role, photoUrl, bio, sortOrder, ...socials },
       supabase,
     );
   } catch (err) {
-    if (err instanceof BoardPhotoUrlError) {
+    if (err instanceof BoardPhotoUrlError || err instanceof BoardSocialUrlError) {
+      // A rejected social URL is a validation error, not an orphaned-photo case — but the
+      // photo already uploaded, so clean it up before returning the friendly message.
+      await deleteBoardPhotoByUrl(photoUrl, supabase);
       return { error: err.message };
     }
     if (pgErrorCode(err) === "PGRST116" || pgErrorCode(err) === "23505") {
@@ -204,6 +233,7 @@ export async function updateBoardMemberAction(
     throw err;
   }
 
+  const socials = readSocialsFromForm(formData);
   const fields: UpdateBoardMemberFields = {
     name,
     seat,
@@ -211,12 +241,18 @@ export async function updateBoardMemberAction(
     photoUrl: nextPhoto,
     bio,
     sortOrder,
+    ...socials,
   };
 
   try {
     await updateBoardMember(id, fields, supabase);
   } catch (err) {
-    if (err instanceof BoardPhotoUrlError) {
+    if (err instanceof BoardPhotoUrlError || err instanceof BoardSocialUrlError) {
+      // The write didn't happen — a freshly-uploaded photo would be an orphan; clean it up
+      // (guards leave the OLD photo untouched via isBoardPhotoStorageUrl + the !== check).
+      if (isBoardPhotoStorageUrl(nextPhoto) && nextPhoto !== oldPhoto) {
+        await deleteBoardPhotoByUrl(nextPhoto, supabase);
+      }
       return { error: err.message };
     }
     if (pgErrorCode(err) === "PGRST116") {
