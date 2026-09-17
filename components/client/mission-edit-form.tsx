@@ -50,7 +50,7 @@ export function MissionEditForm({
         type="submit"
         disabled={pending}
         data-testid="mission-save"
-        className="w-fit rounded-md bg-brand px-4 py-2 font-medium text-header-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
+        className="w-fit rounded-md bg-brand px-4 py-2 font-medium text-brand-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
       >
         {pending ? "Saving…" : "Save mission"}
       </button>

@@ -40,10 +40,13 @@ const BRAND_TEXT = "USVI SOFTBALL FEDERATION";
 // DESIGN.md § "Brand & design tokens" (the authoritative source); the exact
 // strings are enumerated in slice-01b-brand.md §4.1 / §4.4.
 const BRAND = {
-  navy: "rgb(26, 49, 95)", //  #1a315f — --header (masthead) & --accent-foreground (text on gold)
-  gold: "rgb(243, 203, 54)", // #f3cb36 — --accent (Donate pill fill)
-  headerMuted: "rgb(203, 213, 225)", // #cbd5e1 — --header-muted (inactive nav text)
-  white: "rgb(255, 255, 255)", // forbidden as text-on-gold (1.57:1) — see the guard below
+  // Redesign palette: brand blue #2A51C6, accent yellow #E5E849, frosty-white masthead.
+  blue: "rgb(42, 81, 198)", // #2A51C6 — --brand
+  yellow: "rgb(229, 232, 73)", // #E5E849 — --accent (Donate pill fill)
+  accentFg: "rgb(20, 36, 92)", // #14245C — --accent-foreground (dark text on the yellow pill)
+  headerMuted: "rgb(71, 85, 105)", // #475569 — --header-muted (inactive nav text on the white bar)
+  navy: "rgb(26, 49, 95)", // the OLD masthead color — the frosty bar must NOT be this
+  white: "rgb(255, 255, 255)", // forbidden as text-on-yellow — see the guard below
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -149,12 +152,17 @@ test.describe("init-web-009 — brand: masthead + crest (all viewports)", () => 
     await page.goto("/");
   });
 
-  test("masthead background is the navy --header token", async ({ page }) => {
-    // §4.1 #4: --header #1a315f, the constant navy masthead.
-    await expect(page.getByTestId("site-header")).toHaveCSS(
-      "background-color",
-      BRAND.navy,
-    );
+  test("masthead is the frosty translucent white bar", async ({ page }) => {
+    // Redesign: the masthead is a sticky translucent-white bar with a backdrop blur —
+    // NOT the old solid navy. Assert it is not navy and that a backdrop blur is applied
+    // (the translucent white computes to an oklab string, too brittle to match exactly).
+    const header = page.getByTestId("site-header");
+    await expect(header).not.toHaveCSS("background-color", BRAND.navy);
+    const blur = await header.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return s.backdropFilter || (s as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter || "";
+    });
+    expect(blur).toContain("blur");
   });
 
   test("brand crest renders and stays decorative", async ({ page }) => {
@@ -196,10 +204,10 @@ test.describe("init-web-009 — brand: nav link colors (desktop)", () => {
     page,
   }) => {
     const donate = page.getByTestId("nav-link-donate");
-    // §4.1 #1: --accent gold #f3cb36 fill.
-    await expect(donate).toHaveCSS("background-color", BRAND.gold);
-    // §4.1 #2: --accent-foreground navy #1a315f text.
-    await expect(donate).toHaveCSS("color", BRAND.navy);
+    // Redesign: --accent yellow #E5E849 fill.
+    await expect(donate).toHaveCSS("background-color", BRAND.yellow);
+    // --accent-foreground dark blue #14245C text (dark-on-yellow, never white).
+    await expect(donate).toHaveCSS("color", BRAND.accentFg);
   });
 
   test("Donate label is NEVER white-on-gold (forbidden-pair guard)", async ({
@@ -217,7 +225,8 @@ test.describe("init-web-009 — brand: nav link colors (desktop)", () => {
   test("inactive default nav link uses the muted header token", async ({
     page,
   }) => {
-    // §4.1 #5: on `/`, nav-link-articles is inactive → --header-muted #cbd5e1.
+    // Redesign: on `/`, nav-link-articles is inactive → --header-muted slate #475569
+    // (dark-on-white now, was light #cbd5e1 on the old navy bar).
     await expect(page.getByTestId("nav-link-articles")).toHaveCSS(
       "color",
       BRAND.headerMuted,

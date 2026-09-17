@@ -93,7 +93,10 @@ export function BoardGrid({ members }: { members: BoardMember[] }) {
                   >
                     {open.role}
                   </p>
-                  <p className="text-xs uppercase tracking-wide text-muted">
+                  <p
+                    data-testid="board-modal-seat"
+                    className="text-xs uppercase tracking-wide text-muted"
+                  >
                     {SEAT_LABELS[open.seat]}
                   </p>
                 </div>
@@ -145,10 +148,12 @@ function Avatar({
 }) {
   return (
     <span
+      data-testid="board-grid-avatar"
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand ${className}`}
     >
       {member.photoUrl ? (
         <Image
+          data-testid="board-grid-photo"
           src={member.photoUrl}
           alt={`${member.name}, ${member.role}`}
           fill

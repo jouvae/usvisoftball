@@ -253,12 +253,12 @@ test.describe("about-e2e-007 — editor uploads a headshot (desktop)", () => {
     // (next/image rewrites to /_next/image?url=<encoded>) decodes to a board-photos URL.
     await gotoAsAnon(browser, "/about", async (anon) => {
       const card = anon
-        .getByTestId("about-board-roster")
-        .getByTestId("board-member-card")
+        .getByTestId("about-board")
+        .getByTestId("board-grid-card")
         .filter({ hasText: markerName });
       await expect(card).toHaveCount(1);
 
-      const photo = card.getByTestId("board-member-photo");
+      const photo = card.getByTestId("board-grid-avatar");
       const img = photo.locator("img");
       // Presence of an <img> (vs the initials <span>) proves it is NOT the fallback.
       await expect(img).toHaveCount(1);

@@ -19,7 +19,7 @@ const LABELS: Record<ArticleStatus, string> = {
 const TONES: Record<ArticleStatus, string> = {
   draft: "bg-surface text-brand border border-border",
   in_review: "bg-accent text-accent-foreground",
-  published: "bg-brand text-header-foreground",
+  published: "bg-brand text-brand-foreground",
   unpublished: "bg-surface text-muted border border-border",
 };
 

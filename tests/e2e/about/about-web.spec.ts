@@ -127,22 +127,18 @@ test.describe("about-web-001 — mission + current board roster", () => {
     expect((await mission.innerText()).trim().length).toBeGreaterThan(0);
   });
 
-  test("board roster is visible with the current member cards", async ({ page }) => {
-    const roster = page.getByTestId("about-board-roster");
+  test("board grid is visible with the current member cards", async ({ page }) => {
+    const roster = page.getByTestId("about-board");
     await expect(roster).toBeVisible();
     // Count matches the live current-term roster (>0): proves non-empty AND correct term.
     expect(currentCount).toBeGreaterThan(0);
-    await expect(roster.getByTestId("board-member-card")).toHaveCount(
-      currentCount,
-    );
+    await expect(roster.getByTestId("board-grid-card")).toHaveCount(currentCount);
   });
 
   test("a known current member renders", async ({ page }) => {
-    const roster = page.getByTestId("about-board-roster");
+    const roster = page.getByTestId("about-board");
     await expect(
-      roster
-        .getByTestId("board-member-card")
-        .filter({ hasText: knownCurrentMember }),
+      roster.getByTestId("board-grid-card").filter({ hasText: knownCurrentMember }),
     ).toHaveCount(1);
   });
 });
@@ -157,33 +153,42 @@ test.describe("about-web-002 — island seats + initials fallback", () => {
     await gotoOk(page, "/about");
   });
 
-  test("every current card exposes a board-member-seat", async ({ page }) => {
-    const cards = page
-      .getByTestId("about-board-roster")
-      .getByTestId("board-member-card");
-    await expect(cards).toHaveCount(currentCount);
-    // One seat badge per card — no card is missing its constituency.
-    await expect(
-      page.getByTestId("about-board-roster").getByTestId("board-member-seat"),
-    ).toHaveCount(currentCount);
-  });
-
-  test("the three island seat labels all appear across the roster", async ({
+  test("every current card renders a name and opens a modal with a seat", async ({
     page,
   }) => {
-    const seatTexts = await page
-      .getByTestId("about-board-roster")
-      .getByTestId("board-member-seat")
-      .allInnerTexts();
-    // The seat badge is styled `text-transform: uppercase`, so rendered innerText
-    // comes back upper-cased ("ST. CROIX"). Compare case-insensitively against the
-    // canonical SEAT_LABELS — we assert coverage of the seat, not the CSS casing.
-    const normalized = seatTexts.map((t) => t.trim().toUpperCase());
+    const cards = page.getByTestId("about-board").getByTestId("board-grid-card");
+    await expect(cards).toHaveCount(currentCount);
+    // Every card names its member (grid shows name + role; seat lives in the modal).
+    await expect(
+      page.getByTestId("about-board").getByTestId("board-grid-name"),
+    ).toHaveCount(currentCount);
+    // Opening the first card surfaces a non-empty island seat in the profile modal.
+    await cards.first().click();
+    const seat = page.getByTestId("board-modal-seat");
+    await expect(seat).toBeVisible();
+    await expect(seat).not.toBeEmpty();
+    await page.getByTestId("board-modal-close").click();
+  });
+
+  test("the three island seat labels all appear across the roster (via modals)", async ({
+    page,
+  }) => {
+    const cards = page.getByTestId("about-board").getByTestId("board-grid-card");
+    const n = await cards.count();
+    const seatTexts: string[] = [];
+    // The seat now lives in each member's profile modal — open each card in turn.
+    for (let i = 0; i < n; i++) {
+      await cards.nth(i).click();
+      const seat = page.getByTestId("board-modal-seat");
+      await expect(seat).toBeVisible();
+      seatTexts.push((await seat.innerText()).trim().toUpperCase());
+      await page.getByTestId("board-modal-close").click();
+      await expect(page.getByTestId("board-modal")).toHaveJSProperty("open", false);
+    }
     for (const label of EXPECTED_SEAT_LABELS) {
-      expect(
-        normalized,
-        `seat coverage missing "${label}"`,
-      ).toContain(label.toUpperCase());
+      expect(seatTexts, `seat coverage missing "${label}"`).toContain(
+        label.toUpperCase(),
+      );
     }
   });
 
@@ -197,18 +202,18 @@ test.describe("about-web-002 — island seats + initials fallback", () => {
       "every current board member currently has a photo",
     );
     const card = page
-      .getByTestId("about-board-roster")
-      .getByTestId("board-member-card")
+      .getByTestId("about-board")
+      .getByTestId("board-grid-card")
       .filter({ hasText: noPhotoMember! });
     await expect(card).toHaveCount(1);
 
-    // The photo slot exists for every card...
-    const photo = card.getByTestId("board-member-photo");
-    await expect(photo).toBeVisible();
+    // The avatar exists for every card...
+    const avatar = card.getByTestId("board-grid-avatar");
+    await expect(avatar).toBeVisible();
     // ...but for the photoless member it is the navy initials block, NOT a broken
     // <img>: the photoUrl branch is skipped, so no <img> is emitted at all.
-    await expect(photo.locator("img")).toHaveCount(0);
-    await expect(photo).toHaveText(noPhotoInitials);
+    await expect(avatar.locator("img")).toHaveCount(0);
+    await expect(avatar).toHaveText(noPhotoInitials);
   });
 });
 
