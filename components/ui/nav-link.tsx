@@ -22,13 +22,15 @@ export function NavLink({
   className = "",
 }: NavLinkProps) {
   const base =
-    "inline-flex items-center px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors";
+    "inline-flex items-center px-3 py-2 text-sm font-medium tracking-wide transition-colors";
 
+  // Frosty-white nav: dark text on translucent white. The Donate CTA is the yellow accent
+  // pill (dark text); active links are brand-blue with an accent underline.
   const variantClass =
     variant === "cta"
-      ? "rounded-full bg-accent text-accent-foreground hover:bg-accent-hover"
+      ? "rounded-full bg-accent px-4 font-semibold text-accent-foreground hover:bg-accent-hover"
       : active
-        ? "text-header-foreground border-b-2 border-accent"
+        ? "text-brand border-b-2 border-accent"
         : "text-header-muted hover:text-header-foreground";
 
   // External links (e.g. the PayPal Donate button) open in a new tab as a plain anchor;

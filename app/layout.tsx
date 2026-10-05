@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
 // SELF-HOSTED fonts — `next build` performs NO build-time network fetch (a
 // network-less CI / Fly build would fail with `next/font/google`). Geist ships its
@@ -33,7 +34,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} ${oswald.variable} h-full antialiased`}
+      className={cn(
+        "h-full",
+        "antialiased",
+        GeistSans.variable,
+        GeistMono.variable,
+        oswald.variable,
+        "font-sans",
+      )}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

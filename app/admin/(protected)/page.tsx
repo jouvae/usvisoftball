@@ -50,7 +50,7 @@ export default async function AdminDashboardPage() {
             <Link
               data-testid="admin-new-article-link"
               href="/admin/articles/new"
-              className="rounded-md bg-brand px-4 py-2 font-medium text-header-foreground outline-focus hover:bg-brand-hover focus:outline-2"
+              className="rounded-md bg-brand px-4 py-2 font-medium text-brand-foreground outline-focus hover:bg-brand-hover focus:outline-2"
             >
               New article
             </Link>

@@ -83,7 +83,7 @@ export function AiDraftPanel({ className = "" }: { className?: string }) {
           type="submit"
           disabled={generating}
           data-testid="ai-generate"
-          className="w-fit rounded-md bg-brand px-4 py-2 font-medium text-header-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
+          className="w-fit rounded-md bg-brand px-4 py-2 font-medium text-brand-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
         >
           {generating ? "Generating…" : "Generate draft"}
         </button>
@@ -123,7 +123,7 @@ export function AiDraftPanel({ className = "" }: { className?: string }) {
                 type="submit"
                 disabled={accepting}
                 data-testid="ai-accept"
-                className="rounded-md bg-brand px-4 py-2 font-medium text-header-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
+                className="rounded-md bg-brand px-4 py-2 font-medium text-brand-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
               >
                 {accepting ? "Saving…" : "Accept draft"}
               </button>

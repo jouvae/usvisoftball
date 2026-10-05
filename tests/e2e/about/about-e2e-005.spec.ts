@@ -167,8 +167,8 @@ test.describe("about-e2e-005 — editor adds a current-term member (desktop)", (
     await gotoAsAnon(browser, "/about", async (anon) => {
       await expect(
         anon
-          .getByTestId("about-board-roster")
-          .getByTestId("board-member-card")
+          .getByTestId("about-board")
+          .getByTestId("board-grid-card")
           .filter({ hasText: markerName }),
       ).toHaveCount(1);
     });

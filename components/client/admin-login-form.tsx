@@ -52,7 +52,7 @@ export function AdminLoginForm({ className = "" }: { className?: string }) {
         type="submit"
         disabled={pending}
         data-testid="admin-login-submit"
-        className="rounded-md bg-brand px-4 py-2 font-medium text-header-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
+        className="rounded-md bg-brand px-4 py-2 font-medium text-brand-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>

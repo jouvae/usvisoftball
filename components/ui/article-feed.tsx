@@ -15,7 +15,7 @@ export function ArticleFeed({ articles, className = "" }: ArticleFeedProps) {
     <ul
       role="list"
       data-testid="news-feed"
-      className={`grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 ${className}`}
+      className={`grid auto-rows-fr grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 ${className}`}
     >
       {articles.map((article, index) => (
         <ArticleCard

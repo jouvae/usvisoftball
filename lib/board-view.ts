@@ -108,7 +108,7 @@ export interface BoardMember {
   role: string;
   photoUrl: string | null; // null → the missing-photo state (DESIGN.md empty states)
   bio: string;
-  socials: BoardSocials; // MVP slice 5; each link null when unset
+  socials: BoardSocials; // MVP slice 5; each social link (x/linkedin/…) is null when unset
   sortOrder: number;
   createdAt: string; // ISO 8601 (UTC)
   updatedAt: string; // ISO 8601 (UTC)

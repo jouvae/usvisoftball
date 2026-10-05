@@ -22,6 +22,12 @@ export const TEAMS_ENABLED =
 export const EVENTS_ENABLED =
   process.env.NEXT_PUBLIC_EVENTS_ENABLED === "true";
 
+// The Shop is a redesign placeholder (mock items, no commerce yet). Same semantics as
+// the others: enabled ONLY when exactly "true"; unset (prod default) = OFF → /shop 404s
+// and the nav link is hidden. Flip to "true" once real products/checkout land.
+export const SHOP_ENABLED =
+  process.env.NEXT_PUBLIC_SHOP_ENABLED === "true";
+
 // The Donate button (nav) links out to PayPal. Hardcoded (not env) so it survives the
 // env-free Fly build, like next.config's Storage host. TODO: swap PAYPAL_DONATE_URL for
 // the Federation's real PayPal donate link (paypal.me handle or hosted Donate button URL).
