@@ -49,14 +49,6 @@ create policy events_public_read on public.events
 
 -- Seed clearly-sample events (idempotent on slug). Wide dates keep the upcoming/past split
 -- deterministic. NOT real tournament data — placeholder for the federation to replace.
-insert into public.events (name, slug, description, venue, island, start_date, end_date, sort_order) values
-  ('Sample Territorial Championship (Upcoming)', 'sample-territorial-championship',
-   'Placeholder for the Federation''s flagship territorial championship — replace with the confirmed event and dates.',
-   'Lionel Roberts Stadium', 'st_thomas', date '2099-06-01', date '2099-06-07', 10),
-  ('Sample Inter-Island Cup (Upcoming)', 'sample-inter-island-cup',
-   'Placeholder inter-island tournament across St. Thomas, St. John, and St. Croix.',
-   'Multiple venues', null, date '2099-08-15', date '2099-08-18', 20),
-  ('Sample Youth Classic (Past)', 'sample-youth-classic',
-   'Placeholder past youth development tournament — replace with a real edition.',
-   'Canegata Ballpark', 'st_croix', date '2020-04-10', date '2020-04-12', 30)
-on conflict (slug) do nothing;
+-- Sample seed rows REMOVED (home-layout slice 5b, 2026-10-21): the clearly-sample events
+-- were purged from the shared DB, and this insert was dropped so a replay can't restore them.
+-- e2e specs seed their own fixtures (tests/support/sports-fixtures.ts).

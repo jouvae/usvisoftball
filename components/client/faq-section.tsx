@@ -44,7 +44,7 @@ export function FaqSection({
 }) {
   return (
     <section data-testid="about-faq" className={`flex flex-col gap-6 ${className}`}>
-      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
         Frequently asked questions
       </h2>
       <dl className="divide-y divide-border">

@@ -166,23 +166,31 @@ export async function listPublishedArticles(): Promise<ArticleListItem[]> {
 }
 
 // ---------------------------------------------------------------------------
-// The home highlights carousel (MVP slice 4). Editor-curated: published rows the
-// editor flagged `is_highlight`, newest-first. Same RLS-enforced public client +
-// `.eq('status','published')` boundary as the feed; `.eq('is_highlight', true)` is
-// the curation filter. Returns [] when nothing is highlighted (the home page then
-// omits the carousel) — NOT an error.
+// The home "Latest News" grid (home-layout slice 3, design guide §2.5). Curated-first:
+// published rows the editor flagged `is_highlight` lead (newest-first), and the latest
+// un-flagged published rows fill the remaining slots — one query, ordered
+// `is_highlight desc, published_at desc`, capped at `limit`. Same RLS-enforced public
+// client + `.eq('status','published')` boundary as the feed. Each item carries its
+// `isHighlight` flag so the page can mark curated cards. Returns [] when nothing is
+// published — NOT an error.
 // ---------------------------------------------------------------------------
-export async function listHighlightedArticles(): Promise<ArticleListItem[]> {
+export type HomeNewsItem = ArticleListItem & { isHighlight: boolean };
+
+export async function listHomeNews(limit = 3): Promise<HomeNewsItem[]> {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("articles")
-    .select(LIST_COLUMNS)
+    .select(`${LIST_COLUMNS}, is_highlight`)
     .eq("status", "published")
-    .eq("is_highlight", true)
-    .order("published_at", { ascending: false });
+    .order("is_highlight", { ascending: false })
+    .order("published_at", { ascending: false })
+    .limit(limit);
 
   if (error) throw error;
-  return (data ?? []).map((row) => toListItem(row as ArticleListRow));
+  return (data ?? []).map((row) => {
+    const r = row as ArticleListRow & { is_highlight: boolean | null };
+    return { ...toListItem(r), isHighlight: r.is_highlight ?? false };
+  });
 }
 
 // ---------------------------------------------------------------------------

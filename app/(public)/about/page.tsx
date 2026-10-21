@@ -87,10 +87,10 @@ export default async function AboutPage() {
         <div className="mx-auto max-w-6xl px-4 pt-20 pb-24 sm:pt-24 lg:px-8">
           <div className="mx-auto max-w-2xl gap-x-14 lg:mx-0 lg:flex lg:max-w-none lg:items-center">
             <div className="relative w-full lg:max-w-xl lg:shrink-0">
-              <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-brand">
+              <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-navy">
                 The Federation
               </p>
-              <h1 className="mt-4 font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight text-brand sm:text-6xl">
+              <h1 className="mt-4 font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight text-navy sm:text-6xl">
                 {mission?.title ?? "About"}
               </h1>
               {mission ? (
@@ -119,17 +119,17 @@ export default async function AboutPage() {
         <dl className="grid grid-cols-1 gap-8 border-y border-border py-8 sm:grid-cols-3">
           <div className="flex flex-col-reverse gap-2">
             <dt className="text-sm text-muted">Islands served</dt>
-            <dd className="font-display text-4xl font-bold text-brand">3</dd>
+            <dd className="font-display text-4xl font-bold text-navy">3</dd>
           </div>
           <div className="flex flex-col-reverse gap-2">
             <dt className="text-sm text-muted">Home of softball in the</dt>
-            <dd className="font-display text-4xl font-bold text-brand">
+            <dd className="font-display text-4xl font-bold text-navy">
               U.S. Virgin Islands
             </dd>
           </div>
           <div className="flex flex-col-reverse gap-2">
             <dt className="text-sm text-muted">{ISLANDS.join(" · ")}</dt>
-            <dd className="font-display text-4xl font-bold text-brand">
+            <dd className="font-display text-4xl font-bold text-navy">
               One Federation
             </dd>
           </div>
@@ -149,7 +149,7 @@ export default async function AboutPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 py-16 lg:px-8">
         {currentBoard ? (
           <section data-testid="about-board" className="flex flex-col gap-6">
-            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
               Board of Directors
               <span className="ml-2 text-muted">{currentBoard.term.label}</span>
             </h2>
@@ -159,7 +159,7 @@ export default async function AboutPage() {
 
         {archivedTerms.length > 0 ? (
           <section data-testid="about-archive" className="flex flex-col gap-4">
-            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
               Past Boards
             </h2>
             <ul role="list" className="flex flex-col gap-2">
@@ -186,7 +186,7 @@ export default async function AboutPage() {
         {latestArticles.length > 0 ? (
           <section className="flex flex-col gap-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+              <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
                 Latest from the Federation
               </h2>
               <Link

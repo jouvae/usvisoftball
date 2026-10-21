@@ -25,12 +25,12 @@ participation links. `/events/[slug]` renders a "Participating Teams" section
 An unauthenticated visitor opens an event detail page, and clicks a team link.
 
 ## Then
-`sample-inter-island-cup` shows exactly 4 participants — Frenchtown Sluggers,
-Cruz Bay Waves, Christiansted Crushers, Frederiksted Fire — with the right text
+`e2e-inter-island-cup` shows exactly 4 participants — E2E Frenchtown Sluggers,
+E2E Cruz Bay Waves, E2E Christiansted Crushers, E2E Frederiksted Fire — with the right text
 order AND hrefs (order derived from a service-key read of event_teams⋈teams by
-sort_order). `sample-territorial-championship` shows exactly 3, incl. Charlotte
-Amalie Storm. Clicking the first participant lands on /teams/frenchtown-sluggers
-(team-detail visible), and that route returns 200. READ-ONLY: no writes, no teardown.
+sort_order). `e2e-territorial-championship` shows exactly 3, incl. Charlotte
+Amalie Storm. Clicking the first participant lands on /teams/e2e-frenchtown-sluggers
+(team-detail visible), and that route returns 200. Writes only the e2e fixtures, removed in afterAll.
 */
 
 import { test, expect } from "@playwright/test";
@@ -40,6 +40,11 @@ import { test, expect } from "@playwright/test";
 // the Playwright transform aliases `server-only` to a no-op via tests/tsconfig.json (see
 // playwright.config.ts). READ (SELECT) only — never a write, never a teardown.
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  cleanupSportsFixtures,
+  seedSportsFixtures,
+} from "../../support/sports-fixtures";
+
 
 type ParticipantRow = {
   sort_order: number;
@@ -74,8 +79,8 @@ async function readParticipants(eventSlug: string): Promise<Participant[]> {
   });
 }
 
-const CUP_SLUG = "sample-inter-island-cup";
-const CHAMP_SLUG = "sample-territorial-championship";
+const CUP_SLUG = "e2e-inter-island-cup";
+const CHAMP_SLUG = "e2e-territorial-championship";
 
 // MVP launch: the Events section is flag-gated OFF (lib/flags.ts). With the flag
 // unset every Events route returns 404, so these seed-backed specs cannot pass.
@@ -93,6 +98,10 @@ test.describe("events-web-004 — public event participating-teams renders from 
   let champ: Participant[];
 
   test.beforeAll(async () => {
+    if (process.env.NEXT_PUBLIC_EVENTS_ENABLED !== "true") return;
+    // GIVEN: the shared e2e fixtures (tests/support/sports-fixtures.ts) — seeded here,
+    // removed in afterAll. The service-key reads below then track the fixture rows.
+    await seedSportsFixtures();
     // GIVEN: the 0019 seed. Read the ordered participants via the service key so
     // expectations track the actual seeded rows (no out-of-band writes).
     cup = await readParticipants(CUP_SLUG);
@@ -100,13 +109,18 @@ test.describe("events-web-004 — public event participating-teams renders from 
 
     // Fixed-seed guards on the values the scenario names explicitly.
     expect(cup).toEqual([
-      { name: "Frenchtown Sluggers", slug: "frenchtown-sluggers" },
-      { name: "Cruz Bay Waves", slug: "cruz-bay-waves" },
-      { name: "Christiansted Crushers", slug: "christiansted-crushers" },
-      { name: "Frederiksted Fire", slug: "frederiksted-fire" },
+      { name: "E2E Frenchtown Sluggers", slug: "e2e-frenchtown-sluggers" },
+      { name: "E2E Cruz Bay Waves", slug: "e2e-cruz-bay-waves" },
+      { name: "E2E Christiansted Crushers", slug: "e2e-christiansted-crushers" },
+      { name: "E2E Frederiksted Fire", slug: "e2e-frederiksted-fire" },
     ]);
     expect(champ).toHaveLength(3);
-    expect(champ.map((p) => p.name)).toContain("Charlotte Amalie Storm");
+    expect(champ.map((p) => p.name)).toContain("E2E Charlotte Amalie Storm");
+  });
+
+
+  test.afterAll(async () => {
+    await cleanupSportsFixtures();
   });
 
   test("inter-island-cup lists its 4 teams, in order, with correct hrefs", async ({
@@ -137,7 +151,7 @@ test.describe("events-web-004 — public event participating-teams renders from 
     }
   });
 
-  test("territorial-championship lists exactly 3 teams incl. Charlotte Amalie Storm", async ({
+  test("territorial-championship lists exactly 3 teams incl. E2E Charlotte Amalie Storm", async ({
     page,
   }) => {
     const res = await page.goto(`/events/${CHAMP_SLUG}`);
@@ -156,7 +170,7 @@ test.describe("events-web-004 — public event participating-teams renders from 
     await expect(
       section
         .getByTestId("event-participant-name")
-        .filter({ hasText: "Charlotte Amalie Storm" }),
+        .filter({ hasText: "E2E Charlotte Amalie Storm" }),
     ).toHaveCount(1);
   });
 
@@ -169,20 +183,20 @@ test.describe("events-web-004 — public event participating-teams renders from 
       .getByTestId("event-participants")
       .getByTestId("event-participant-name")
       .first();
-    await expect(firstName).toHaveText("Frenchtown Sluggers");
+    await expect(firstName).toHaveText("E2E Frenchtown Sluggers");
     await expect(firstName).toHaveAttribute(
       "href",
-      "/teams/frenchtown-sluggers",
+      "/teams/e2e-frenchtown-sluggers",
     );
     await firstName.click();
 
     // THEN: the URL is the team detail route and the team detail section renders.
-    await expect(page).toHaveURL(/\/teams\/frenchtown-sluggers$/);
+    await expect(page).toHaveURL(/\/teams\/e2e-frenchtown-sluggers$/);
     await expect(page.getByTestId("team-detail")).toBeVisible();
   });
 
   test("the linked team route resolves (200, not 404)", async ({ page }) => {
-    const res = await page.goto("/teams/frenchtown-sluggers");
+    const res = await page.goto("/teams/e2e-frenchtown-sluggers");
     expect(res, "no response for team detail route").not.toBeNull();
     expect(res!.status()).toBe(200);
     await expect(page.getByTestId("team-detail")).toBeVisible();

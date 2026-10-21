@@ -1,18 +1,21 @@
 import Link from "next/link";
 import { safeLogoHref } from "@/lib/teams-view";
-import type { Island, Team } from "@/lib/teams";
+import type { Team } from "@/lib/teams";
 
 // The public teams directory on /teams (teams-web-001). Server Component — no
 // interactivity. Teams are grouped by island (caller passes non-empty groups in display
 // order); each card shows name, division, description, home venue, and a logo if set. All
 // text React-escaped. A logo is rendered as a plain <img> (a local /public path today; the
 // admin-CRUD slice adds uploads). Empty groups are omitted upstream.
+// Also renders the national-teams section on /teams (one group, distinct testids).
 export function TeamsDirectory({
   groups,
   testId = "teams-directory",
+  groupTestId = "team-island-group",
 }: {
-  groups: { island: Island; label: string; teams: Team[] }[];
+  groups: { key: string; label: string; teams: Team[] }[];
   testId?: string;
+  groupTestId?: string;
 }) {
   if (groups.length === 0) return null;
 
@@ -20,13 +23,13 @@ export function TeamsDirectory({
     <section data-testid={testId} className="flex flex-col gap-12">
       {groups.map((group) => (
         <div
-          key={group.island}
-          data-testid="team-island-group"
+          key={group.key}
+          data-testid={groupTestId}
           className="flex flex-col gap-6"
         >
           <h2
             data-testid="team-island-name"
-            className="font-display text-2xl font-bold uppercase tracking-tight text-brand"
+            className="font-display text-2xl font-bold uppercase tracking-tight text-navy"
           >
             {group.label}
           </h2>
@@ -48,7 +51,7 @@ export function TeamsDirectory({
                     className="h-16 w-16 rounded-md object-contain"
                   />
                 ) : null}
-                <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-brand">
+                <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-navy">
                   <Link
                     href={`/teams/${team.slug}`}
                     data-testid="team-name"

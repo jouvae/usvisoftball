@@ -5,10 +5,12 @@ import { assertBoardPhotoUrlAllowed } from "@/lib/board";
 import {
   type Island,
   type Team,
+  type TeamKind,
   type TeamPlayer,
   type TeamWithRoster,
   ISLAND_LABELS,
   ISLAND_ORDER,
+  TEAM_KIND_LABELS,
 } from "@/lib/teams-view";
 
 // ---------------------------------------------------------------------------
@@ -23,10 +25,12 @@ import {
 export {
   type Island,
   type Team,
+  type TeamKind,
   type TeamPlayer,
   type TeamWithRoster,
   ISLAND_LABELS,
   ISLAND_ORDER,
+  TEAM_KIND_LABELS,
 };
 
 type PlayerRow = {
@@ -60,10 +64,13 @@ type TeamRow = {
   id: string;
   name: string;
   slug: string;
-  island: Island;
+  kind: TeamKind;
+  short_name: string;
+  island: Island | null;
   division: string;
   description: string;
   logo_url: string;
+  cover_image_url: string;
   home_venue: string;
   founded_year: number | null;
   sort_order: number;
@@ -74,10 +81,13 @@ function toTeam(row: TeamRow): Team {
     id: row.id,
     name: row.name,
     slug: row.slug,
+    kind: row.kind,
+    shortName: row.short_name,
     island: row.island,
     division: row.division,
     description: row.description,
     logoUrl: row.logo_url,
+    coverImageUrl: row.cover_image_url,
     homeVenue: row.home_venue,
     foundedYear: row.founded_year,
     sortOrder: row.sort_order,
@@ -85,15 +95,16 @@ function toTeam(row: TeamRow): Team {
 }
 
 const COLUMNS =
-  "id,name,slug,island,division,description,logo_url,home_venue,founded_year,sort_order";
+  "id,name,slug,kind,short_name,island,division,description,logo_url,cover_image_url,home_venue,founded_year,sort_order";
 
-// All teams, ordered (sort_order, then name). Bounded read.
+// All teams — or only one `kind` — ordered (sort_order, then name). Bounded read.
 export async function listTeams(
   supabase: SupabaseClient = createPublicClient(),
+  opts: { kind?: TeamKind } = {},
 ): Promise<Team[]> {
-  const { data, error } = await supabase
-    .from("teams")
-    .select(COLUMNS)
+  let query = supabase.from("teams").select(COLUMNS);
+  if (opts.kind) query = query.eq("kind", opts.kind);
+  const { data, error } = await query
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true })
     .limit(200);
@@ -101,15 +112,16 @@ export async function listTeams(
   return (data as TeamRow[] | null ?? []).map(toTeam);
 }
 
-// Group teams by island in the canonical display order, dropping empty islands. The
-// directory renders one section per non-empty group.
+// Group CLUBS by island in the canonical display order, dropping empty islands. National
+// teams (no island) are excluded — /teams lists them in their own section first.
 export function groupTeamsByIsland(
   teams: Team[],
-): { island: Island; label: string; teams: Team[] }[] {
+): { key: Island; island: Island; label: string; teams: Team[] }[] {
   return ISLAND_ORDER.map((island) => ({
+    key: island,
     island,
     label: ISLAND_LABELS[island],
-    teams: teams.filter((t) => t.island === island),
+    teams: teams.filter((t) => t.kind === "club" && t.island === island),
   })).filter((g) => g.teams.length > 0);
 }
 
@@ -143,10 +155,13 @@ export async function getTeamBySlug(
 
 export interface CreateTeamInput {
   name: string;
-  island: Island;
+  kind?: TeamKind;
+  shortName?: string;
+  island: Island | null;
   division?: string;
   description?: string;
   logoUrl?: string | null;
+  coverImageUrl?: string | null;
   homeVenue?: string;
   foundedYear?: number | null;
   sortOrder?: number;
@@ -154,10 +169,13 @@ export interface CreateTeamInput {
 
 export interface UpdateTeamFields {
   name?: string;
-  island?: Island;
+  kind?: TeamKind;
+  shortName?: string;
+  island?: Island | null;
   division?: string;
   description?: string;
   logoUrl?: string | null;
+  coverImageUrl?: string | null;
   homeVenue?: string;
   foundedYear?: number | null;
   sortOrder?: number;
@@ -181,15 +199,19 @@ export async function createTeam(
   supabase: SupabaseClient,
 ): Promise<Team> {
   assertBoardPhotoUrlAllowed(input.logoUrl);
+  assertBoardPhotoUrlAllowed(input.coverImageUrl);
   const { data, error } = await supabase
     .from("teams")
     .insert({
       name: input.name,
       slug: slugifyTeam(input.name),
+      kind: input.kind ?? "club",
+      short_name: input.shortName ?? "",
       island: input.island,
       division: input.division ?? "",
       description: input.description ?? "",
       logo_url: input.logoUrl ?? "",
+      cover_image_url: input.coverImageUrl ?? "",
       home_venue: input.homeVenue ?? "",
       founded_year: input.foundedYear ?? null,
       sort_order: input.sortOrder ?? 0,
@@ -207,12 +229,16 @@ export async function updateTeam(
   supabase: SupabaseClient,
 ): Promise<Team> {
   if (fields.logoUrl !== undefined) assertBoardPhotoUrlAllowed(fields.logoUrl);
+  if (fields.coverImageUrl !== undefined) assertBoardPhotoUrlAllowed(fields.coverImageUrl);
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (fields.name !== undefined) patch.name = fields.name;
+  if (fields.kind !== undefined) patch.kind = fields.kind;
+  if (fields.shortName !== undefined) patch.short_name = fields.shortName;
   if (fields.island !== undefined) patch.island = fields.island;
   if (fields.division !== undefined) patch.division = fields.division;
   if (fields.description !== undefined) patch.description = fields.description;
   if (fields.logoUrl !== undefined) patch.logo_url = fields.logoUrl ?? "";
+  if (fields.coverImageUrl !== undefined) patch.cover_image_url = fields.coverImageUrl ?? "";
   if (fields.homeVenue !== undefined) patch.home_venue = fields.homeVenue;
   if (fields.foundedYear !== undefined) patch.founded_year = fields.foundedYear;
   if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;

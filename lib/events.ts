@@ -40,6 +40,7 @@ type EventRow = {
   start_date: string | null;
   end_date: string | null;
   logo_url: string;
+  cover_image_url: string;
   sort_order: number;
 };
 
@@ -54,12 +55,13 @@ function toEvent(row: EventRow): FederationEvent {
     startDate: row.start_date,
     endDate: row.end_date,
     logoUrl: row.logo_url,
+    coverImageUrl: row.cover_image_url,
     sortOrder: row.sort_order,
   };
 }
 
 const COLUMNS =
-  "id,name,slug,description,venue,island,start_date,end_date,logo_url,sort_order";
+  "id,name,slug,description,venue,island,start_date,end_date,logo_url,cover_image_url,sort_order";
 
 // All events, bounded read. Ordering is applied per-group in splitEventsByDate.
 export async function listEvents(
@@ -123,6 +125,27 @@ export function todayISO(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
+// The home "Upcoming Event" band (home-layout §2.4): the soonest event that hasn't ended —
+// end_date >= today, or no end_date with start_date >= today — ordered by start_date (NOT
+// sort_order, which is the directory's editorial order). Undated events are skipped: the
+// band needs a date to show. Returns null when nothing is upcoming (the band is omitted).
+export async function getNextEvent(
+  todayIso: string,
+  supabase: SupabaseClient = createPublicClient(),
+): Promise<FederationEvent | null> {
+  const { data, error } = await supabase
+    .from("events")
+    .select(COLUMNS)
+    .not("start_date", "is", null)
+    .or(`end_date.gte.${todayIso},and(end_date.is.null,start_date.gte.${todayIso})`)
+    .order("start_date", { ascending: true })
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toEvent(data as EventRow) : null;
+}
+
 // Split events into Upcoming (end_date >= today, OR no end_date — undated events are treated
 // as upcoming/current) and Past (end_date < today). Upcoming sorted soonest-first
 // (sort_order, then start_date asc); Past most-recent-first (end_date desc, then sort_order).
@@ -166,6 +189,7 @@ export interface CreateEventInput {
   startDate?: string | null;
   endDate?: string | null;
   logoUrl?: string | null;
+  coverImageUrl?: string | null;
   sortOrder?: number;
 }
 
@@ -177,6 +201,7 @@ export interface UpdateEventFields {
   startDate?: string | null;
   endDate?: string | null;
   logoUrl?: string | null;
+  coverImageUrl?: string | null;
   sortOrder?: number;
 }
 
@@ -198,6 +223,7 @@ export async function createEvent(
   supabase: SupabaseClient,
 ): Promise<FederationEvent> {
   assertBoardPhotoUrlAllowed(input.logoUrl);
+  assertBoardPhotoUrlAllowed(input.coverImageUrl);
   const { data, error } = await supabase
     .from("events")
     .insert({
@@ -209,6 +235,7 @@ export async function createEvent(
       start_date: input.startDate ?? null,
       end_date: input.endDate ?? null,
       logo_url: input.logoUrl ?? "",
+      cover_image_url: input.coverImageUrl ?? "",
       sort_order: input.sortOrder ?? 0,
     })
     .select(COLUMNS)
@@ -224,6 +251,7 @@ export async function updateEvent(
   supabase: SupabaseClient,
 ): Promise<FederationEvent> {
   if (fields.logoUrl !== undefined) assertBoardPhotoUrlAllowed(fields.logoUrl);
+  if (fields.coverImageUrl !== undefined) assertBoardPhotoUrlAllowed(fields.coverImageUrl);
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (fields.name !== undefined) patch.name = fields.name;
   if (fields.description !== undefined) patch.description = fields.description;
@@ -232,6 +260,7 @@ export async function updateEvent(
   if (fields.startDate !== undefined) patch.start_date = fields.startDate;
   if (fields.endDate !== undefined) patch.end_date = fields.endDate;
   if (fields.logoUrl !== undefined) patch.logo_url = fields.logoUrl ?? "";
+  if (fields.coverImageUrl !== undefined) patch.cover_image_url = fields.coverImageUrl ?? "";
   if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;
 
   const { data, error } = await supabase

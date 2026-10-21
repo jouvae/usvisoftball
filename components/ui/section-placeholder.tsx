@@ -16,7 +16,7 @@ export function SectionPlaceholder({
       data-testid="section-placeholder"
       className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-16 ${className}`}
     >
-      <h1 className="font-display uppercase font-bold tracking-tight text-4xl text-brand">
+      <h1 className="font-display uppercase font-bold tracking-tight text-4xl text-navy">
         {title}
       </h1>
       <p className="text-muted">{description}</p>

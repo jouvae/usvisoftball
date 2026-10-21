@@ -124,6 +124,18 @@ export default async function AdminDashboardPage() {
               Events admin
             </Link>
           ) : null}
+          {/* The home stats admin screen (home-layout slice 4) is editor-only — same
+              canReview gate; every stat Server Action re-runs requireRole('editor') and
+              the 0023 RLS re-enforces at the row, so this gate only decides what to render. */}
+          {canReview ? (
+            <Link
+              data-testid="admin-stats-link"
+              href="/admin/stats"
+              className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+            >
+              Home stats
+            </Link>
+          ) : null}
           {/* The AI draft panel is for contributor OR editor (slice-09 §5.1), and
               only when the NEXT_PUBLIC_AI_DRAFT_ENABLED flag is on — prod hides it. */}
           {AI_DRAFT_ENABLED && (canAuthor || canReview) ? (

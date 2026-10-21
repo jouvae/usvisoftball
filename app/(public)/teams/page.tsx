@@ -12,23 +12,33 @@ export const dynamic = "force-dynamic";
 export default async function TeamsPage() {
   if (!TEAMS_ENABLED) notFound(); // dormant for MVP launch
   const teams = await listTeams();
+  // National teams lead (design guide §4.2), then island clubs grouped by island.
+  const national = teams.filter((t) => t.kind === "national");
   const groups = groupTeamsByIsland(teams);
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-12">
       <div className="flex flex-col gap-2">
-        <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
+        <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-navy">
           Teams
         </h1>
         <p className="max-w-3xl text-lg text-muted">
-          Member clubs of the USVI Softball Federation, across St. Thomas, St.
-          John, and St. Croix.
+          The U.S. Virgin Islands national teams, and the member clubs of the
+          Federation across St. Thomas, St. John, and St. Croix.
         </p>
       </div>
 
+      {national.length > 0 ? (
+        <TeamsDirectory
+          groups={[{ key: "national", label: "National teams", teams: national }]}
+          testId="teams-national"
+          groupTestId="team-national-group"
+        />
+      ) : null}
+
       {groups.length > 0 ? (
         <TeamsDirectory groups={groups} />
-      ) : (
+      ) : national.length > 0 ? null : (
         <p data-testid="teams-empty" className="text-muted">
           Teams will be listed here soon.
         </p>

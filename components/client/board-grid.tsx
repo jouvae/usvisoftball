@@ -51,7 +51,7 @@ export function BoardGrid({ members }: { members: BoardMember[] }) {
               <span className="flex flex-col gap-1">
                 <span
                   data-testid="board-grid-name"
-                  className="font-display text-base font-bold leading-tight text-brand"
+                  className="font-display text-base font-bold leading-tight text-navy"
                 >
                   {m.name}
                 </span>
@@ -83,7 +83,7 @@ export function BoardGrid({ members }: { members: BoardMember[] }) {
                 <div className="flex flex-col gap-1">
                   <h2
                     data-testid="board-modal-name"
-                    className="font-display text-2xl font-bold leading-tight text-brand"
+                    className="font-display text-2xl font-bold leading-tight text-navy"
                   >
                     {open.name}
                   </h2>

@@ -17,6 +17,14 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // Home-layout design guide §1.4/§8: gold primary (navy label), and outline variants for
+        // navy and light surfaces. Apply to <Link>/<a> via buttonVariants() as well as <Button>.
+        accent:
+          "bg-accent font-display font-semibold tracking-wide text-accent-foreground hover:bg-accent-hover focus-visible:ring-navy/40",
+        "outline-dark":
+          "border-white/40 font-display font-semibold tracking-wide text-navy-foreground hover:bg-white/10 focus-visible:border-accent focus-visible:ring-accent/50",
+        "outline-light":
+          "border-navy/40 bg-white font-display font-semibold tracking-wide text-navy hover:bg-surface",
       },
       size: {
         default:
@@ -30,6 +38,8 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
+        // Marketing CTA size: ≥44px touch target, display type.
+        cta: "h-11 gap-2 px-5 text-sm sm:text-base [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

@@ -62,7 +62,7 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
 
         <h1
           data-testid="article-headline"
-          className="font-display text-4xl font-bold leading-tight tracking-tight text-brand"
+          className="font-display text-4xl font-bold leading-tight tracking-tight text-navy"
         >
           {article.title}
         </h1>
@@ -100,7 +100,7 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
           className="border-t border-border bg-surface"
         >
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-12">
-            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
               More stories
             </h2>
             <ArticleFeed articles={more} />

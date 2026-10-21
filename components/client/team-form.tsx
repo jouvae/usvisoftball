@@ -4,8 +4,8 @@ import { useActionState } from "react";
 // ANTI-LEAK: ISLAND_LABELS is a client-safe RUNTIME value — import it from the
 // view module (no `server-only`), NEVER from "@/lib/teams" (server-only). Team is
 // a type-only import from the same client-safe module.
-import { ISLAND_LABELS, safeLogoHref } from "@/lib/teams-view";
-import type { Team, Island } from "@/lib/teams-view";
+import { ISLAND_LABELS, TEAM_KIND_LABELS, safeLogoHref } from "@/lib/teams-view";
+import type { Team, Island, TeamKind } from "@/lib/teams-view";
 import type { TeamActionState } from "@/app/admin/(protected)/teams/actions";
 
 // The team form island (teams-e2e-003). ONE island serves BOTH add and edit: the caller
@@ -42,6 +42,7 @@ export function TeamForm({
   );
 
   const islandKeys = Object.keys(ISLAND_LABELS) as Island[];
+  const kindKeys = Object.keys(TEAM_KIND_LABELS) as TeamKind[];
   const currentLogo = team?.logoUrl ?? "";
   const previewSrc = safeLogoHref(currentLogo); // guard the preview too
   const localPathValue = currentLogo.startsWith("/") ? currentLogo : "";
@@ -65,13 +66,44 @@ export function TeamForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        Type
+        <select
+          name="kind"
+          defaultValue={team?.kind ?? "club"}
+          data-testid="team-kind"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        >
+          {kindKeys.map((key) => (
+            <option key={key} value={key}>
+              {TEAM_KIND_LABELS[key]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        Short name
+        <span className="text-xs font-normal text-muted">
+          Optional — used on the home page button (“Meet the U18s”)
+        </span>
+        <input
+          type="text"
+          name="shortName"
+          defaultValue={team?.shortName ?? ""}
+          data-testid="team-short-name"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
         Island
         <select
           name="island"
-          defaultValue={team?.island ?? islandKeys[0]}
+          defaultValue={team ? (team.island ?? "") : islandKeys[0]}
           data-testid="team-island"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         >
+          <option value="">None — national team</option>
           {islandKeys.map((key) => (
             <option key={key} value={key}>
               {ISLAND_LABELS[key]}
@@ -180,6 +212,21 @@ export function TeamForm({
           placeholder="/seed/team.png"
           defaultValue={localPathValue}
           data-testid="team-logo"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        Cover photo path
+        <span className="text-xs font-normal text-muted">
+          Optional team photo for the home page and team page, e.g. /teams/u18.jpg
+        </span>
+        <input
+          type="text"
+          name="coverImageUrl"
+          placeholder="/teams/team-photo.jpg"
+          defaultValue={team?.coverImageUrl ?? ""}
+          data-testid="team-cover"
           className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
         />
       </label>

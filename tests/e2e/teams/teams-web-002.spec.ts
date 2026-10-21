@@ -17,7 +17,7 @@ references:
 ---
 
 ## Given
-The 0013 + 0014 seed exists (5 teams, 17 roster players across them, public-read
+The shared e2e fixtures exist (tests/support/sports-fixtures.ts, seeded in beforeAll and removed in afterAll) (5 fixture clubs, 17 roster players across them, public-read
 RLS) and an unauthenticated visitor is on `/teams`.
 
 ## When
@@ -28,7 +28,7 @@ detail page for a slug that does not exist.
 The link navigates to the team's detail page, which renders `team-detail` with the
 correct name/island/division/description and a `team-roster` whose rows match the
 seeded `team_players` for that team, in `sort_order`. An unknown slug returns HTTP
-404 and renders no `team-detail`. READ-ONLY: no writes, no teardown.
+404 and renders no `team-detail`. Writes only the e2e fixtures, removed in afterAll.
 */
 
 import { test, expect, type Page } from "@playwright/test";
@@ -38,6 +38,11 @@ import { test, expect, type Page } from "@playwright/test";
 // `server-only`-fenced; the Playwright transform aliases `server-only` to a no-op via
 // tests/tsconfig.json (see playwright.config.ts). READ (SELECT) only — never a write.
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  cleanupSportsFixtures,
+  seedSportsFixtures,
+} from "../../support/sports-fixtures";
+
 
 type SeedPlayer = {
   jersey_number: number | null;
@@ -84,13 +89,22 @@ test.describe("teams-web-002 — public team detail renders from seed", () => {
   let crushers: SeedPlayer[];
 
   test.beforeAll(async () => {
+    if (process.env.NEXT_PUBLIC_TEAMS_ENABLED !== "true") return;
+    // GIVEN: the shared e2e fixtures (tests/support/sports-fixtures.ts) — seeded here,
+    // removed in afterAll. The service-key reads below then track the fixture rows.
+    await seedSportsFixtures();
     // GIVEN: the 0014 seed. Read the two rosters under test once, via the service
     // key, so every assertion below tracks the actual seeded rows (no out-of-band writes).
-    frenchtown = await readRoster("frenchtown-sluggers");
-    crushers = await readRoster("christiansted-crushers");
+    frenchtown = await readRoster("e2e-frenchtown-sluggers");
+    crushers = await readRoster("e2e-christiansted-crushers");
     // Guard against a silently-empty read masquerading as a pass.
     expect(frenchtown.length, "frenchtown roster empty").toBe(4);
     expect(crushers.length, "crushers roster empty").toBe(4);
+  });
+
+
+  test.afterAll(async () => {
+    await cleanupSportsFixtures();
   });
 
   test("clicking a directory team name navigates to its detail page", async ({
@@ -102,24 +116,24 @@ test.describe("teams-web-002 — public team detail renders from seed", () => {
 
     const link = page
       .getByTestId("team-name")
-      .filter({ hasText: "Frenchtown Sluggers" });
-    await expect(link).toHaveAttribute("href", "/teams/frenchtown-sluggers");
+      .filter({ hasText: "E2E Frenchtown Sluggers" });
+    await expect(link).toHaveAttribute("href", "/teams/e2e-frenchtown-sluggers");
     await link.click();
 
     // THEN: we land on the detail route and it renders.
-    await expect(page).toHaveURL(/\/teams\/frenchtown-sluggers$/);
+    await expect(page).toHaveURL(/\/teams\/e2e-frenchtown-sluggers$/);
     await expect(page.getByTestId("team-detail")).toBeVisible();
   });
 
-  test("detail header + roster match the seed for Frenchtown Sluggers", async ({
+  test("detail header + roster match the seed for E2E Frenchtown Sluggers", async ({
     page,
   }) => {
-    const res = await page.goto("/teams/frenchtown-sluggers");
+    const res = await page.goto("/teams/e2e-frenchtown-sluggers");
     expect(res?.status()).toBe(200);
 
     await expect(page.getByTestId("team-detail")).toBeVisible();
     await expect(page.getByTestId("team-detail-name")).toHaveText(
-      "Frenchtown Sluggers",
+      "E2E Frenchtown Sluggers",
     );
     await expect(page.getByTestId("team-detail-island")).toHaveText("St. Thomas");
     await expect(page.getByTestId("team-detail-division")).not.toBeEmpty();
@@ -137,14 +151,14 @@ test.describe("teams-web-002 — public team detail renders from seed", () => {
     await expect(first.getByTestId("player-position")).toHaveText("SS");
   });
 
-  test("a second team (Christiansted Crushers) also renders its seeded roster", async ({
+  test("a second team (E2E Christiansted Crushers) also renders its seeded roster", async ({
     page,
   }) => {
-    const res = await page.goto("/teams/christiansted-crushers");
+    const res = await page.goto("/teams/e2e-christiansted-crushers");
     expect(res?.status()).toBe(200);
 
     await expect(page.getByTestId("team-detail-name")).toHaveText(
-      "Christiansted Crushers",
+      "E2E Christiansted Crushers",
     );
     const rows = page.getByTestId("team-roster-row");
     await expect(rows).toHaveCount(crushers.length);

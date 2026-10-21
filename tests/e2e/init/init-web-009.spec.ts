@@ -40,10 +40,11 @@ const BRAND_TEXT = "USVI SOFTBALL FEDERATION";
 // DESIGN.md § "Brand & design tokens" (the authoritative source); the exact
 // strings are enumerated in slice-01b-brand.md §4.1 / §4.4.
 const BRAND = {
-  // Redesign palette: brand blue #2A51C6, accent yellow #E5E849, frosty-white masthead.
+  // Home-layout palette (design guide §1.1): royal #2A51C6 (interactive), gold #F7CF4F accent,
+  // navy #0A2557 text on gold, frosty-white masthead.
   blue: "rgb(42, 81, 198)", // #2A51C6 — --brand
-  yellow: "rgb(229, 232, 73)", // #E5E849 — --accent (Donate pill fill)
-  accentFg: "rgb(20, 36, 92)", // #14245C — --accent-foreground (dark text on the yellow pill)
+  yellow: "rgb(247, 207, 79)", // #F7CF4F — --accent (Support pill fill)
+  accentFg: "rgb(10, 37, 87)", // #0A2557 — --accent-foreground (navy text on the gold pill)
   headerMuted: "rgb(71, 85, 105)", // #475569 — --header-muted (inactive nav text on the white bar)
   navy: "rgb(26, 49, 95)", // the OLD masthead color — the frosty bar must NOT be this
   white: "rgb(255, 255, 255)", // forbidden as text-on-yellow — see the guard below
@@ -204,9 +205,9 @@ test.describe("init-web-009 — brand: nav link colors (desktop)", () => {
     page,
   }) => {
     const donate = page.getByTestId("nav-link-donate");
-    // Redesign: --accent yellow #E5E849 fill.
+    // --accent gold #F7CF4F fill.
     await expect(donate).toHaveCSS("background-color", BRAND.yellow);
-    // --accent-foreground dark blue #14245C text (dark-on-yellow, never white).
+    // --accent-foreground navy #0A2557 text (dark-on-gold, never white).
     await expect(donate).toHaveCSS("color", BRAND.accentFg);
   });
 

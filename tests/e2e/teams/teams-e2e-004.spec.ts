@@ -15,33 +15,34 @@ references:
   - lib/teams.ts (createTeamPlayer/updateTeamPlayer/deleteTeamPlayer; getTeamPlayerPhotoUrl)
   - lib/board-photos.ts (uploadBoardPhoto: declared-type + magic-byte validation; reap by URL)
   - components/ui/team-roster.tsx (public /teams/[slug]: team-roster, team-roster-row, player-*)
-  - supabase/migrations/0014_team_players.sql (team_players; FK cascade; 17 seeded across 5 teams)
+  - supabase/migrations/0014_team_players.sql (team_players; FK cascade)
   - supabase/migrations/0016_team_players_admin.sql (editor-only team_players write RLS)
   - supabase/migrations/0009_board_photos_storage.sql (board-photos bucket, editor-only write)
 ---
 
-The roster (player) admin-CRUD slice against the seeded team `cruz-bay-waves` (3 seeded players).
+The roster (player) admin-CRUD slice against the e2e fixture club `e2e-cruz-bay-waves` (3 fixture
+players; tests/support/sports-fixtures.ts, seeded in beforeAll and removed in afterAll).
 Every write goes through the real editor session; the RLS on team_players is the boundary. Only
-MARKER-named players are ever created/edited/deleted — the 3 seeded Cruz Bay players are untouched.
+MARKER-named players are ever created/edited/deleted — the 3 fixture players are untouched.
 
-(a) From /admin/teams the Cruz Bay Waves row exposes a manage-roster-link → /admin/teams/
-    cruz-bay-waves; navigating there shows roster-admin.
+(a) From /admin/teams the E2E Cruz Bay Waves row exposes a manage-roster-link → /admin/teams/
+    e2e-cruz-bay-waves; navigating there shows roster-admin.
 (b) An EDITOR adds a player (marker name, #99, position P, uploaded PNG). It persists (service
     read: jersey_number=99, photo_url is a board-photos URL, object EXISTS via LIST api) and
-    renders on /teams/cruz-bay-waves as a team-roster-row with a player-photo avatar img.
+    renders on /teams/e2e-cruz-bay-waves as a team-roster-row with a player-photo avatar img.
 (c) Editing the player (position → SS) persists (service read + public detail).
 (d) A magic-byte-SPOOFED photo upload is rejected with pl-add-error, creates NO player and —
     validation runs BEFORE upload — leaves NO new Storage object.
-(e) Deleting the player removes it from /teams/cruz-bay-waves and reaps its photo object (GONE
-    via LIST api); the 3 seeded Cruz Bay players remain.
-(f) A CONTRIBUTOR is redirected /admin/teams/cruz-bay-waves → /admin; ANON → /admin/login; a
+(e) Deleting the player removes it from /teams/e2e-cruz-bay-waves and reaps its photo object (GONE
+    via LIST api); the 3 fixture Cruz Bay players remain.
+(f) A CONTRIBUTOR is redirected /admin/teams/e2e-cruz-bay-waves → /admin; ANON → /admin/login; a
     direct PostgREST INSERT/UPDATE/DELETE on `team_players` with the contributor JWT / anon key
     is denied (RLS).
 
 MANDATORY TEARDOWN (shared prod DB + Storage): every player uses a unique marker name. afterAll
 (service key) collects each marker player's photo object, DELETEs the marker players, removes the
-collected board-photos objects, then asserts: 0 marker players, team_players back to 17 seeded
-rows, and none of the collected objects remain (LIST api). Desktop-gated. The service-key admin
+collected board-photos objects, then asserts: 0 marker players, team_players back to the baseline
+count captured in beforeAll, and none of the collected objects remain (LIST api). Desktop-gated. The service-key admin
 client is teardown + out-of-band verification ONLY — every app write goes through the editor.
 */
 
@@ -49,6 +50,11 @@ import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BOARD_PHOTOS_BUCKET } from "@/lib/board-photos";
 import { randomUUID } from "node:crypto";
+import {
+  FX_PLAYERS,
+  cleanupSportsFixtures,
+  seedSportsFixtures,
+} from "../../support/sports-fixtures";
 
 const isDesktop = (t: TestInfo): boolean => t.project.name === "desktop";
 
@@ -61,9 +67,12 @@ const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SERVICE_KEY = process.env.SUPABASE_KEY;
 
 const MARKER_PREFIX = "e2e-004-marker";
-const TEAM_SLUG = "cruz-bay-waves";
-const SEEDED_PLAYER_TOTAL = 17; // across all 5 teams
-const SEEDED_CRUZ_BAY_TOTAL = 3; // must survive untouched
+const TEAM_SLUG = "e2e-cruz-bay-waves";
+// The fixture club's own players must survive untouched.
+const FX_CRUZ_BAY_TOTAL = FX_PLAYERS.filter((p) => p.team === "cruzBay").length; // 3
+// team_players count captured in beforeAll (after seeding fixtures + clearing stale markers):
+// the DB holds real rosters too, so teardown proves "back to where we started".
+let baselinePlayers = -1;
 const PHOTO_PUBLIC_BASE = `${(SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/${BOARD_PHOTOS_BUCKET}/`;
 
 // A minimal but genuine 1x1 PNG (correct magic bytes) — passes the magic-byte sniff.
@@ -216,7 +225,7 @@ async function openCruzBayRoster(page: Page): Promise<void> {
   await page.goto("/admin/teams");
   await expect(page.getByTestId("teams-admin")).toBeVisible();
   const cruz = page.locator('[data-testid="team-admin-item"]', {
-    hasText: "Cruz Bay Waves",
+    hasText: "E2E Cruz Bay Waves",
   });
   const link = cruz.getByTestId("manage-roster-link");
   await expect(link).toHaveAttribute("href", `/admin/teams/${TEAM_SLUG}`);
@@ -272,12 +281,18 @@ test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz
   );
 
   test.beforeAll(async ({}, testInfo) => {
-    if (!isDesktop(testInfo)) return;
+    if (!isDesktop(testInfo) || process.env.NEXT_PUBLIC_TEAMS_ENABLED !== "true") return;
+    await seedSportsFixtures();
     await deleteMarkerData();
+    const { count, error } = await createAdminClient()
+      .from("team_players")
+      .select("*", { count: "exact", head: true });
+    if (error) throw error;
+    baselinePlayers = count ?? 0;
   });
 
   test.afterAll(async ({}, testInfo) => {
-    if (!isDesktop(testInfo)) return;
+    if (!isDesktop(testInfo) || process.env.NEXT_PUBLIC_TEAMS_ENABLED !== "true") return;
     const reapedKeys = await deleteMarkerData();
     const admin = createAdminClient();
 
@@ -292,8 +307,8 @@ test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz
       .from("team_players")
       .select("*", { count: "exact", head: true });
     if (pErr) throw pErr;
-    expect(playersTotal, "TEARDOWN: team_players back to 17 seeded rows").toBe(
-      SEEDED_PLAYER_TOTAL,
+    expect(playersTotal, "TEARDOWN: team_players back to the baseline count").toBe(
+      baselinePlayers,
     );
 
     const teamId = await cruzBayTeamId();
@@ -302,8 +317,8 @@ test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz
       .select("*", { count: "exact", head: true })
       .eq("team_id", teamId);
     if (cErr) throw cErr;
-    expect(cruzTotal, "TEARDOWN: 3 seeded Cruz Bay players remain").toBe(
-      SEEDED_CRUZ_BAY_TOTAL,
+    expect(cruzTotal, "TEARDOWN: the 3 fixture Cruz Bay players remain").toBe(
+      FX_CRUZ_BAY_TOTAL,
     );
 
     for (const key of reapedKeys) {
@@ -312,6 +327,8 @@ test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz
         `TEARDOWN: marker Storage object ${key} must be gone`,
       ).toBe(false);
     }
+
+    await cleanupSportsFixtures();
   });
 
   test("(a→c,e) manage-roster link → add w/ PNG → persists+renders → edit position → delete reaps photo", async ({
@@ -384,7 +401,7 @@ test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz
       .poll(async () => objectExists(photoKey!), { timeout: 10_000 })
       .toBe(false);
 
-    // …while the 3 seeded Cruz Bay players survive untouched.
+    // …while the 3 fixture Cruz Bay players survive untouched.
     const teamId = created.team_id;
     const admin = createAdminClient();
     const { count: cruzTotal, error: cErr } = await admin
@@ -392,8 +409,8 @@ test.describe("teams-e2e-004 — roster (player) admin CRUD + photo reap + authz
       .select("*", { count: "exact", head: true })
       .eq("team_id", teamId);
     if (cErr) throw cErr;
-    expect(cruzTotal, "3 seeded Cruz Bay players remain after delete").toBe(
-      SEEDED_CRUZ_BAY_TOTAL,
+    expect(cruzTotal, "the 3 fixture Cruz Bay players remain after delete").toBe(
+      FX_CRUZ_BAY_TOTAL,
     );
   });
 

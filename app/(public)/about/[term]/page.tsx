@@ -31,7 +31,7 @@ export default async function AboutTermPage({
         >
           ← About
         </Link>
-        <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
+        <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-navy">
           Board {found.term.label}
         </h1>
       </div>

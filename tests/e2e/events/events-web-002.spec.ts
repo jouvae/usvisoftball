@@ -17,19 +17,19 @@ references:
 ---
 
 ## Given
-The 0017 seed exists (3 clearly-sample events, public-read RLS). An unauthenticated
+The shared e2e fixtures exist (tests/support/sports-fixtures.ts, seeded in beforeAll and removed in afterAll) (3 fixture events, public-read RLS). An unauthenticated
 visitor is on `/events`, where each `event-name` is now a link to `/events/{slug}`.
 
 ## When
 The visitor clicks an event's name link, or navigates directly to `/events/{slug}`.
 
 ## Then
-`/events/sample-territorial-championship` renders `event-detail` with the event's
+`/events/e2e-territorial-championship` renders `event-detail` with the event's
 name, en-dash date range "Jun 1–7, 2099", a venue containing "Lionel Roberts
 Stadium", island "St. Thomas", and a description. The island-null event
-`/events/sample-inter-island-cup` renders `event-detail` with NO
+`/events/e2e-inter-island-cup` renders `event-detail` with NO
 `event-detail-island`. An unknown slug returns HTTP 404 and no `event-detail`.
-READ-ONLY: no writes, no teardown.
+Writes only the e2e fixtures, removed in afterAll.
 */
 
 import { test, expect } from "@playwright/test";
@@ -39,6 +39,11 @@ import { test, expect } from "@playwright/test";
 // `server-only`-fenced; the Playwright transform aliases `server-only` to a no-op via
 // tests/tsconfig.json (see playwright.config.ts). READ (SELECT) only — never a write.
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  cleanupSportsFixtures,
+  seedSportsFixtures,
+} from "../../support/sports-fixtures";
+
 import {
   EVENT_ISLAND_LABELS,
   formatEventDateRange,
@@ -67,8 +72,8 @@ async function readEvent(slug: string): Promise<EventRow> {
   return data as EventRow;
 }
 
-const CHAMP_SLUG = "sample-territorial-championship";
-const NULL_ISLAND_SLUG = "sample-inter-island-cup";
+const CHAMP_SLUG = "e2e-territorial-championship";
+const NULL_ISLAND_SLUG = "e2e-inter-island-cup";
 
 // MVP launch: the Events section is flag-gated OFF (lib/flags.ts). With the flag
 // unset every Events route returns 404, so these seed-backed specs cannot pass.
@@ -86,19 +91,28 @@ test.describe("events-web-002 — public event detail renders from seed", () => 
   let nullIsland: EventRow;
 
   test.beforeAll(async () => {
+    if (process.env.NEXT_PUBLIC_EVENTS_ENABLED !== "true") return;
+    // GIVEN: the shared e2e fixtures (tests/support/sports-fixtures.ts) — seeded here,
+    // removed in afterAll. The service-key reads below then track the fixture rows.
+    await seedSportsFixtures();
     // GIVEN: the 0017 seed. Read the two rows this scenario asserts against via the
     // service key so expectations track the actual seeded values (no out-of-band writes).
     champ = await readEvent(CHAMP_SLUG);
     nullIsland = await readEvent(NULL_ISLAND_SLUG);
 
     // Fixed-seed guards on the values the scenario names explicitly.
-    expect(champ.name).toBe("Sample Territorial Championship (Upcoming)");
+    expect(champ.name).toBe("E2E Territorial Championship (Upcoming)");
     expect(champ.island).toBe("st_thomas");
     expect(formatEventDateRange(champ.start_date, champ.end_date)).toBe(
       "Jun 1–7, 2099",
     );
     expect(champ.venue).toContain("Lionel Roberts Stadium");
     expect(nullIsland.island).toBeNull();
+  });
+
+
+  test.afterAll(async () => {
+    await cleanupSportsFixtures();
   });
 
   test("clicking an event-name link on /events navigates to its detail page", async ({

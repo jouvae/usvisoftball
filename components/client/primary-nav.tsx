@@ -2,19 +2,33 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { Heart } from "lucide-react";
 import { NavLink } from "@/components/ui/nav-link";
-import { PAYPAL_DONATE_URL, SHOP_ENABLED } from "@/lib/flags";
+import {
+  EVENTS_ENABLED,
+  PAYPAL_DONATE_URL,
+  SHOP_ENABLED,
+  TEAMS_ENABLED,
+} from "@/lib/flags";
 
-// Nav: logo (SiteBrand, → home) on the left; Articles · About · [Shop] · Donate on the
-// right. Teams/Events stay dormant (flagged off). Shop shows ONLY when SHOP_ENABLED — it's
-// a redesign placeholder until real commerce lands. Donate is an external CTA to PayPal.
+// Nav (home-layout design guide §3.1): logo (SiteBrand, → home) on the left; Teams · Events ·
+// News · Get Involved · [Shop] · About, then the gold "Support the Federation" pill (external,
+// PayPal). Teams/Events/Shop render only while their flags are on. "News" keeps the
+// /articles route and the nav-link-articles testid; the pill keeps nav-link-donate.
 const NAV_ITEMS = [
-  { href: "/articles", label: "Articles", testId: "nav-link-articles" },
-  { href: "/about", label: "About", testId: "nav-link-about" },
+  ...(TEAMS_ENABLED
+    ? [{ href: "/teams", label: "Teams", testId: "nav-link-teams" }]
+    : []),
+  ...(EVENTS_ENABLED
+    ? [{ href: "/events", label: "Events", testId: "nav-link-events" }]
+    : []),
+  { href: "/articles", label: "News", testId: "nav-link-articles" },
+  { href: "/get-involved", label: "Get Involved", testId: "nav-link-involved" },
   ...(SHOP_ENABLED
     ? [{ href: "/shop", label: "Shop", testId: "nav-link-shop" }]
     : []),
-] as const;
+  { href: "/about", label: "About", testId: "nav-link-about" },
+];
 
 export function PrimaryNav({ className = "" }: { className?: string }) {
   const [open, setOpen] = useState(false);
@@ -29,7 +43,7 @@ export function PrimaryNav({ className = "" }: { className?: string }) {
         aria-controls="primary-nav"
         aria-label="Toggle navigation"
         onClick={() => setOpen((v) => !v)}
-        className="md:hidden inline-flex items-center rounded-md border border-border px-3 py-2 text-sm font-medium uppercase tracking-wide text-header-foreground hover:bg-surface"
+        className="lg:hidden inline-flex min-h-11 items-center rounded-md border border-border px-3 py-2 text-sm font-medium uppercase tracking-wide text-header-foreground hover:bg-surface"
       >
         Menu
       </button>
@@ -38,7 +52,7 @@ export function PrimaryNav({ className = "" }: { className?: string }) {
         id="primary-nav"
         aria-label="Primary"
         data-testid="primary-nav"
-        className={`${open ? "flex" : "hidden"} md:flex basis-full md:basis-auto w-full md:w-auto flex-col md:flex-row md:items-center gap-1 pt-2 md:pt-0 ${className}`}
+        className={`${open ? "flex" : "hidden"} lg:flex basis-full lg:basis-auto w-full lg:w-auto flex-col lg:flex-row lg:items-center gap-1 pt-2 lg:pt-0 ${className}`}
       >
         {NAV_ITEMS.map((item) => (
           <NavLink
@@ -52,11 +66,14 @@ export function PrimaryNav({ className = "" }: { className?: string }) {
         ))}
         <NavLink
           href={PAYPAL_DONATE_URL}
-          label="Donate"
+          label="Support the Federation"
+          shortLabel="Support"
+          icon={<Heart aria-hidden="true" className="size-4 fill-current" />}
           testId="nav-link-donate"
           active={false}
           variant="cta"
           external
+          className="mt-2 justify-center lg:mt-0 lg:ml-3"
           onNavigate={() => setOpen(false)}
         />
       </nav>

@@ -30,19 +30,6 @@ create policy event_teams_public_read on public.event_teams
   for select using (true);
 
 -- Seed participation links, resolving both ids by slug (idempotent on the composite PK).
-insert into public.event_teams (event_id, team_id, sort_order)
-select e.id, t.id, x.sort
-from (values
-  ('sample-territorial-championship', 'frenchtown-sluggers',    10),
-  ('sample-territorial-championship', 'charlotte-amalie-storm', 20),
-  ('sample-territorial-championship', 'christiansted-crushers', 30),
-  ('sample-inter-island-cup',         'frenchtown-sluggers',    10),
-  ('sample-inter-island-cup',         'cruz-bay-waves',         20),
-  ('sample-inter-island-cup',         'christiansted-crushers', 30),
-  ('sample-inter-island-cup',         'frederiksted-fire',      40),
-  ('sample-youth-classic',            'frederiksted-fire',      10),
-  ('sample-youth-classic',            'cruz-bay-waves',         20)
-) as x(event_slug, team_slug, sort)
-join public.events e on e.slug = x.event_slug
-join public.teams  t on t.slug = x.team_slug
-on conflict (event_id, team_id) do nothing;
+-- Sample seed rows REMOVED (home-layout slice 5b, 2026-10-21): the clearly-sample event participations
+-- were purged from the shared DB, and this insert was dropped so a replay can't restore them.
+-- e2e specs seed their own fixtures (tests/support/sports-fixtures.ts).
