@@ -14,6 +14,8 @@ primary_region = 'ewr'
 [build.args]
   NEXT_PUBLIC_TEAMS_ENABLED = "true"
   NEXT_PUBLIC_EVENTS_ENABLED = "true"
+  # Google Analytics 4 (public site only; see lib/flags.ts GA_MEASUREMENT_ID).
+  NEXT_PUBLIC_GA_MEASUREMENT_ID = "G-DS4Z8KKPNX"
 
 [http_service]
   internal_port = 8080

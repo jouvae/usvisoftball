@@ -142,3 +142,34 @@
 
 Content still owed: real stats (`/admin/stats`), national-team cover photos, confirmed Pan Am dates,
 and a review of the drafted team/Get Involved copy.
+
+## About-page team section + Google Analytics (2026-10-21, uncommitted)
+- **Board data (prod DB, live now):** the current term (2025–2027) holds the real roster, in
+  order: Elroy Hill (President); Jose Rosario, Bobby Thomas, Emarito Cortez (Vice Presidents);
+  Erainee Dacosta, Renee Smith (Secretaries); Sherry-Ann Francis (Treasurer); Julien Powell
+  (Public Relations). The sample members Delroy Richards, Yolanda Benjamin and Terrence Gumbs
+  are deleted. Headshots from `public/<firstname>.jpeg` were uploaded to the `board-photos`
+  bucket (random keys), so editors can replace them in `/admin/board`. The `public/*.jpeg`
+  files stay uncommitted.
+  - Elroy Hill's old photo was a cartoon placeholder. It is cleared, so his card shows "EH"
+    initials until a real headshot is uploaded.
+  - Seats are unconfirmed, so every member is stored `at_large` and the seat is no longer
+    shown publicly. Bios are empty.
+  - Open: there are two Secretaries (Erainee Dacosta and Renee Smith); is one Assistant
+    Secretary? The photo file is `emaritto.jpeg` but the roster says "Emarito"; which spelling
+    is right? `pat.jpeg` belongs to someone not on the roster. The archived 2023–2025 term
+    (Ivan Fredericks, Sandra Peters) is still sample data, and the 0008 permanence guard
+    keeps it immutable.
+- **Layout:** `BoardGrid` follows `components/samples/board-member-section.tsx`: a centered
+  "Meet our leadership" header, large round headshots, then name, office and social icons.
+  It is 4-up on lg and 2-up on phones (the sample's 1-up made 8 members ~2,800px tall). The
+  card still opens the profile modal, now without the seat. Social icons are links outside
+  the button, shared with the footer through `components/ui/social-icons.tsx`.
+  - Tests: about-web-002 drops the seat-coverage checks; home-board expects the new h2.
+- **Google Analytics:** `@next/third-parties` `<GoogleAnalytics>` is in the `(public)` layout
+  (not `/admin`). It renders only when the build sets `NEXT_PUBLIC_GA_MEASUREMENT_ID` (Dockerfile
+  ARG; `fly.toml` `[build.args]` = `G-DS4Z8KKPNX`), so dev, local and e2e builds send nothing.
+  Verified with a local build that has the ID: gtag loads on `/` and `/about` but not on
+  `/admin/login`.
+- Verified: about-web, home-board and home-hero-involved specs: 23 passed, 13 skipped.
+  `tsc` and lint are clean.

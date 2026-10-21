@@ -13,7 +13,7 @@ references:
   - components/ui/board-member-card.tsx
 scenarios:
   - about-web-001: /about renders the mission + current board roster (4 members)
-  - about-web-002: each current card shows its island seat; no-photo → initials fallback
+  - about-web-002: each current card shows name + office and opens its profile (no seat shown publicly); no-photo → initials fallback
   - about-web-003: archive term link → archived roster; bad slug → real HTTP 404
 ---
 
@@ -25,7 +25,6 @@ one project for determinism against the shared DB), matching the init house styl
 */
 
 import { test, expect, type Page } from "@playwright/test";
-import { SEAT_LABELS } from "@/lib/board";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // ---------------------------------------------------------------------------
@@ -74,14 +73,6 @@ test.beforeAll(async () => {
     noPhotoInitials = initialsOf(noPhoto.name);
   }
 });
-
-// Island coverage — the three human seat labels that MUST appear across the
-// current roster (single source of truth is SEAT_LABELS, so test + UI never drift).
-const EXPECTED_SEAT_LABELS = [
-  SEAT_LABELS.st_thomas_st_john, // "St. Thomas / St. John"
-  SEAT_LABELS.st_croix, //           "St. Croix"
-  SEAT_LABELS.at_large, //           "At-Large"
-];
 
 // Archived term (isCurrent=false) and its roster.
 const ARCHIVE_SLUG = "2023-2025";
@@ -144,52 +135,30 @@ test.describe("about-web-001 — mission + current board roster", () => {
 });
 
 // ===========================================================================
-// about-web-002 — every card shows its island seat; no-photo → initials fallback.
+// about-web-002 — name + office cards open the profile; no-photo → initials fallback.
+// The island seat is no longer shown publicly (the real roster's seats are unconfirmed and
+// the team-section layout shows name + office only), so the old seat-coverage checks are gone.
 // ===========================================================================
-test.describe("about-web-002 — island seats + initials fallback", () => {
+test.describe("about-web-002 — profile modal + initials fallback", () => {
   desktopOnly();
 
   test.beforeEach(async ({ page }) => {
     await gotoOk(page, "/about");
   });
 
-  test("every current card renders a name and opens a modal with a seat", async ({
+  test("every current card renders a name and opens the matching profile", async ({
     page,
   }) => {
-    const cards = page.getByTestId("about-board").getByTestId("board-grid-card");
+    const board = page.getByTestId("about-board");
+    const cards = board.getByTestId("board-grid-card");
     await expect(cards).toHaveCount(currentCount);
-    // Every card names its member (grid shows name + role; seat lives in the modal).
-    await expect(
-      page.getByTestId("about-board").getByTestId("board-grid-name"),
-    ).toHaveCount(currentCount);
-    // Opening the first card surfaces a non-empty island seat in the profile modal.
+    await expect(board.getByTestId("board-grid-name")).toHaveCount(currentCount);
     await cards.first().click();
-    const seat = page.getByTestId("board-modal-seat");
-    await expect(seat).toBeVisible();
-    await expect(seat).not.toBeEmpty();
+    await expect(page.getByTestId("board-modal-name")).toHaveText(knownCurrentMember);
+    await expect(page.getByTestId("board-modal-role")).not.toBeEmpty();
+    await expect(page.getByTestId("board-modal-seat")).toHaveCount(0);
     await page.getByTestId("board-modal-close").click();
-  });
-
-  test("the three island seat labels all appear across the roster (via modals)", async ({
-    page,
-  }) => {
-    const cards = page.getByTestId("about-board").getByTestId("board-grid-card");
-    const n = await cards.count();
-    const seatTexts: string[] = [];
-    // The seat now lives in each member's profile modal — open each card in turn.
-    for (let i = 0; i < n; i++) {
-      await cards.nth(i).click();
-      const seat = page.getByTestId("board-modal-seat");
-      await expect(seat).toBeVisible();
-      seatTexts.push((await seat.innerText()).trim().toUpperCase());
-      await page.getByTestId("board-modal-close").click();
-      await expect(page.getByTestId("board-modal")).toHaveJSProperty("open", false);
-    }
-    for (const label of EXPECTED_SEAT_LABELS) {
-      expect(seatTexts, `seat coverage missing "${label}"`).toContain(
-        label.toUpperCase(),
-      );
-    }
+    await expect(page.getByTestId("board-modal")).toHaveJSProperty("open", false);
   });
 
   test("the no-photo member renders the initials fallback (no <img>)", async ({

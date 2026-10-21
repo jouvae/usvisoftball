@@ -4,6 +4,7 @@ import { getContactInfo } from "@/lib/contact";
 import { listCommittees } from "@/lib/committees";
 import { listPublishedArticles } from "@/lib/articles";
 import { BoardGrid } from "@/components/client/board-grid";
+import { AccentRule } from "@/components/ui/motifs/accent-rule";
 import { ArticleCard } from "@/components/ui/article-card";
 import { ContactSection } from "@/components/ui/contact-section";
 import { CommitteesSection } from "@/components/ui/committees-section";
@@ -148,11 +149,29 @@ export default async function AboutPage() {
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 py-16 lg:px-8">
         {currentBoard ? (
-          <section data-testid="about-board" className="flex flex-col gap-6">
-            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
-              Board of Directors
-              <span className="ml-2 text-muted">{currentBoard.term.label}</span>
-            </h2>
+          // Team section — the "Meet our leadership" layout from
+          // components/samples/board-member-section.tsx, in the site's type and colours.
+          <section
+            data-testid="about-board"
+            aria-labelledby="about-board-heading"
+            className="flex flex-col gap-14 py-8 sm:gap-16"
+          >
+            <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
+              <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-muted">
+                Board of Directors · {currentBoard.term.label}
+              </p>
+              <h2
+                id="about-board-heading"
+                className="font-display text-4xl font-bold uppercase tracking-tight text-balance text-navy sm:text-5xl"
+              >
+                Meet our leadership
+              </h2>
+              <AccentRule />
+              <p className="text-lg text-muted">
+                The volunteer board that leads softball across St. Thomas, St. John, and St.
+                Croix, from youth programs to the national teams.
+              </p>
+            </div>
             <BoardGrid members={currentMembers} />
           </section>
         ) : null}
