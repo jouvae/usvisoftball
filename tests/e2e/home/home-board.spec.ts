@@ -316,9 +316,9 @@ test.describe("home-board — board grid, profile modal, and editor-editable soc
     // GIVEN/WHEN: an anonymous visitor loads home.
     await gotoHome(page);
 
-    // THEN: the /about board section + its "Board of Directors" h2 render.
+    // THEN: the /about board section + its "Meet our leadership" h2 render.
     await expect(
-      page.getByRole("heading", { level: 2, name: /Board of Directors/i }),
+      page.getByRole("heading", { level: 2, name: /Meet our leadership/i }),
     ).toBeVisible();
 
     // The grid has ≥1 card.
