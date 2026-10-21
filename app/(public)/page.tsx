@@ -16,7 +16,7 @@ export default async function Home() {
   return (
     <div className="flex flex-1 flex-col">
       {/* Hero — full-bleed brand-blue band; the frosty nav sits above it. */}
-      <section className="bg-brand text-brand-foreground">
+      <section className="bg-navy text-navy-foreground">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-20 sm:py-28">
           <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-accent">
             U.S. Virgin Islands
@@ -50,7 +50,7 @@ export default async function Home() {
       {/* Highlights */}
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-16">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+          <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
             {highlights.length > 0 ? "Highlights" : "Latest news"}
           </h2>
           <Link

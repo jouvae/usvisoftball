@@ -8,7 +8,7 @@ export function SiteBrand({ className = "" }: { className?: string }) {
     <Link
       href="/"
       data-testid="site-brand"
-      className={`inline-flex items-center gap-2 font-display uppercase font-bold tracking-tight leading-none text-brand text-lg sm:text-xl ${className}`}
+      className={`inline-flex items-center gap-2 font-display uppercase font-bold tracking-tight leading-none text-navy text-lg sm:text-xl ${className}`}
     >
       <Image
         src="/brand/crest-sm.png"

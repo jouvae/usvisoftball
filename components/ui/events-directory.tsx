@@ -19,7 +19,7 @@ function EventGroup({
   if (events.length === 0) return null;
   return (
     <div data-testid={testId} className="flex flex-col gap-6">
-      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
         {title}
       </h2>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -32,7 +32,7 @@ function EventGroup({
               data-testid="event-card"
               className="flex flex-col gap-2 rounded-lg border border-border bg-background p-5"
             >
-              <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-brand">
+              <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-navy">
                 <Link
                   href={`/events/${ev.slug}`}
                   data-testid="event-name"

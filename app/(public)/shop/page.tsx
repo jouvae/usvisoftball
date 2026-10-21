@@ -51,7 +51,7 @@ export default function ShopPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <section className="bg-brand text-brand-foreground">
+      <section className="bg-navy text-navy-foreground">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-16">
           <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-accent">
             Federation Store
@@ -83,7 +83,7 @@ export default function ShopPage() {
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
-              <h2 className="mt-4 font-display text-base font-bold text-brand">
+              <h2 className="mt-4 font-display text-base font-bold text-navy">
                 {product.name}
               </h2>
               <p className="text-sm text-muted">{product.availability}</p>

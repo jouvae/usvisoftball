@@ -21,7 +21,7 @@ export default async function ArticlesPage() {
         <EmptyState />
       ) : (
         <>
-          <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
+          <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-navy">
             Articles
           </h1>
           <ArticlesBrowser articles={articles} />

@@ -17,7 +17,7 @@ export default async function TeamsPage() {
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-12">
       <div className="flex flex-col gap-2">
-        <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
+        <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-navy">
           Teams
         </h1>
         <p className="max-w-3xl text-lg text-muted">

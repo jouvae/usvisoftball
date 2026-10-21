@@ -55,7 +55,7 @@ export default async function EventDetailPage({
         ) : null}
         <h1
           data-testid="event-detail-name"
-          className="font-display text-4xl font-bold uppercase tracking-tight text-brand"
+          className="font-display text-4xl font-bold uppercase tracking-tight text-navy"
         >
           {event.name}
         </h1>
@@ -88,7 +88,7 @@ export default async function EventDetailPage({
           data-testid="event-participants"
           className="flex flex-col gap-4"
         >
-          <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+          <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
             Participating Teams
           </h2>
           <ul role="list" className="flex flex-col gap-2">

@@ -34,16 +34,20 @@ import { test, expect } from "@playwright/test";
 import { PAYPAL_DONATE_URL } from "@/lib/flags";
 
 // The nav links are always attached, but they collapse behind the mobile toggle
-// below the md breakpoint — so composition (count/href/attributes) is asserted
+// below the lg breakpoint — so composition (count/href/attributes) is asserted
 // on the attached elements, which holds at every viewport.
 // Shop is a redesign nav item, flag-gated by NEXT_PUBLIC_SHOP_ENABLED. The dev/test
 // server enables it (.env.local), so it is present here; prod leaves it off.
 const PRESENT = [
   "nav-link-articles",
+  "nav-link-involved",
   "nav-link-about",
   "nav-link-shop",
   "nav-link-donate",
 ];
+// Teams/Events are flag-gated (NEXT_PUBLIC_TEAMS_ENABLED / _EVENTS_ENABLED); .env.local leaves
+// them off, so they are absent here. nav-link-news never returns: "News" is the label of
+// nav-link-articles (route /articles).
 const REMOVED = [
   "nav-link-news",
   "nav-link-teams",
@@ -58,7 +62,7 @@ test.describe("shell-mvp — primary nav", () => {
     await page.goto("/");
   });
 
-  test("shows Articles · About · Shop · Donate and none of the removed items", async ({
+  test("shows News · Get Involved · Shop · About · Support and none of the removed items", async ({
     page,
   }) => {
     for (const testId of PRESENT) {
@@ -80,6 +84,10 @@ test.describe("shell-mvp — primary nav", () => {
     await expect(page.getByTestId("nav-link-about")).toHaveAttribute(
       "href",
       "/about",
+    );
+    await expect(page.getByTestId("nav-link-involved")).toHaveAttribute(
+      "href",
+      "/get-involved",
     );
   });
 

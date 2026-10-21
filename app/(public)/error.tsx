@@ -19,7 +19,7 @@ export default function PublicError({
       data-testid="public-error"
       className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-start gap-4 px-4 py-24"
     >
-      <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
+      <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-navy">
         Something went wrong
       </h1>
       <p className="text-muted">

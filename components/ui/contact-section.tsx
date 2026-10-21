@@ -24,7 +24,7 @@ export function ContactSection({
 
   return (
     <section data-testid={testId} className="flex flex-col gap-4">
-      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
         Contact
       </h2>
       <dl className="flex flex-col gap-3 text-foreground">

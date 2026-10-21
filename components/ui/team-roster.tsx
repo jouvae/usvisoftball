@@ -42,7 +42,7 @@ export function TeamRoster({
             >
               <td
                 data-testid="player-number"
-                className="py-2 pr-4 font-display font-semibold text-brand"
+                className="py-2 pr-4 font-display font-semibold text-navy"
               >
                 {p.jerseyNumber ?? "—"}
               </td>

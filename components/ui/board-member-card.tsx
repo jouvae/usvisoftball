@@ -73,7 +73,7 @@ export function BoardMemberCard({ member, className = "" }: BoardMemberCardProps
 
         <h3
           data-testid="board-member-name"
-          className="font-display text-xl font-bold leading-tight tracking-tight text-brand"
+          className="font-display text-xl font-bold leading-tight tracking-tight text-navy"
         >
           {name}
         </h3>

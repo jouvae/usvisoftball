@@ -26,7 +26,7 @@ export function TeamsDirectory({
         >
           <h2
             data-testid="team-island-name"
-            className="font-display text-2xl font-bold uppercase tracking-tight text-brand"
+            className="font-display text-2xl font-bold uppercase tracking-tight text-navy"
           >
             {group.label}
           </h2>
@@ -48,7 +48,7 @@ export function TeamsDirectory({
                     className="h-16 w-16 rounded-md object-contain"
                   />
                 ) : null}
-                <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-brand">
+                <h3 className="font-display text-xl font-bold leading-tight tracking-tight text-navy">
                   <Link
                     href={`/teams/${team.slug}`}
                     data-testid="team-name"

@@ -15,7 +15,7 @@ export function CommitteesSection({
 
   return (
     <section data-testid={testId} className="flex flex-col gap-6">
-      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+      <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
         Committees
       </h2>
       <div className="grid gap-6 sm:grid-cols-2">
@@ -27,7 +27,7 @@ export function CommitteesSection({
           >
             <h3
               data-testid="committee-name"
-              className="font-display text-xl font-bold leading-tight tracking-tight text-brand"
+              className="font-display text-xl font-bold leading-tight tracking-tight text-navy"
             >
               {c.name}
             </h3>

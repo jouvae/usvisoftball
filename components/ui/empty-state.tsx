@@ -11,7 +11,7 @@ export function EmptyState({ className = "" }: EmptyStateProps) {
       data-testid="news-empty-state"
       className={`flex flex-col gap-3 py-16 ${className}`}
     >
-      <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-brand">
+      <h1 className="font-display text-4xl font-bold uppercase tracking-tight text-navy">
         No stories yet
       </h1>
       <p className="text-muted">

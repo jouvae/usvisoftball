@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Primary brand — USVI Softball blue (#2A51C6). White text sits on it. */
+  /* Royal — USVI Softball blue (#2A51C6). Interactive only: links, focus ring, active nav. */
   --brand: #2a51c6;
   --brand-hover: #1e3ea0;
   --brand-foreground: #ffffff;
@@ -18,11 +18,17 @@
   --header-foreground: #0f172a;
   --header-muted: #475569;
   --header-hover: #eef2ff;
-  /* Accent — bright yellow (#E5E849). Too light for text on white, so it is ACCENT-ONLY:
-     used as a fill with dark text (accent-foreground) on top. */
-  --accent: #e5e849;
-  --accent-foreground: #14245c;
-  --accent-hover: #d2d53b;
+  /* Accent — federation gold (#F7CF4F). 1.5:1 on white, so it is NEVER text or an icon on a
+     light surface: only a fill with navy text on top, a decorative rule, or an icon on navy. */
+  --accent: #f7cf4f;
+  --accent-foreground: #0a2557;
+  --accent-hover: #e9be35;
+  /* Navy — the dark surface (hero scrim, team panels, event band, footer) and headings on light.
+     Royal --brand is now INTERACTIVE-ONLY (links, focus, active indicator). */
+  --navy: #0a2557;
+  --navy-raised: #13336f;
+  --navy-foreground: #ffffff;
+  --navy-muted: #c8d3ea;
   --focus: #2a51c6;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -70,6 +76,10 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-hover: var(--accent-hover);
+  --color-navy: var(--navy);
+  --color-navy-raised: var(--navy-raised);
+  --color-navy-foreground: var(--navy-foreground);
+  --color-navy-muted: var(--navy-muted);
   --color-focus: var(--focus);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

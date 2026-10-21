@@ -32,7 +32,7 @@ export default async function TeamDetailPage({
         </Link>
         <h1
           data-testid="team-detail-name"
-          className="font-display text-4xl font-bold uppercase tracking-tight text-brand"
+          className="font-display text-4xl font-bold uppercase tracking-tight text-navy"
         >
           {team.name}
         </h1>
@@ -60,7 +60,7 @@ export default async function TeamDetailPage({
       ) : null}
 
       <div className="flex flex-col gap-4">
-        <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-brand">
+        <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
           Roster
         </h2>
         <TeamRoster players={team.players} />
