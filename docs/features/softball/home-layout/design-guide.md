@@ -277,7 +277,7 @@ existing empty state.
   without photos.
 - Grid: `sm:grid-cols-2 lg:grid-cols-3`; the 3rd card spans 2 on sm. The first card gets `priority`
   **only if** the hero has no photo (otherwise the hero is the LCP).
-- `HighlightsCarousel` is **retired from the home page**. Delete it if nothing else uses it.
+- `HighlightsCarousel` is **retired from the home page** (deleted in slice 3; nothing else used it).
 
 ### 2.6 Get Involved — `data-testid="home-involved"`
 

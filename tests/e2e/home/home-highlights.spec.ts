@@ -1,46 +1,47 @@
 /*
 ---
 id: home-highlights
-name: "home-highlights: editor-curated home highlights carousel + toggle round-trip (MVP slice 4)"
-feature: softball/init
+name: "home-highlights: curated home news grid (highlights first) + editor toggle round-trip (home-layout slice 3)"
+feature: softball/home-layout
 stack: web
 priority: P0
 group: A
 references:
   - app/(public)/page.tsx
-  - components/client/highlights-carousel.tsx
+  - components/ui/article-card.tsx
   - components/client/highlight-toggle-form.tsx
   - app/admin/(protected)/review/[id]/page.tsx
   - lib/articles.ts
 ---
 
 ## Given
-The public home reads listHighlightedArticles() (published AND is_highlight,
-newest-first) and renders a hero <h1> + a highlights section: an always-present
-"view all articles" link, and — when ≥1 highlight — a <HighlightsCarousel>
-(data-testid highlights-carousel → highlights-track of article-card cards, plus
-prev/next). An editor, on a PUBLISHED article's /admin/review/[id], gets a
-HighlightToggleForm (toggle-highlight button + highlight-state) whose Server Action
-flips articles.is_highlight and revalidates "/".
+The public home reads listHomeNews(3): published articles ordered is_highlight desc,
+published_at desc, capped at 3. It renders a "Latest News" section (home-news) with an
+always-present home-news-link → /articles and, when ≥1 article is published, a
+home-news-grid of ≤3 article-card cards, each carrying data-highlight="true|false". An
+editor, on a PUBLISHED article's /admin/review/[id], gets a HighlightToggleForm
+(toggle-highlight button + highlight-state) whose Server Action flips articles.is_highlight
+and revalidates "/". (Replaces the slice-4 highlights carousel.)
 
 ## When
-(1) An anonymous visitor loads "/". (2) A signed-in editor opens a published
-article's review desk and clicks toggle-highlight, then a fresh anon visitor
-reloads "/". (3) The editor clicks toggle-highlight a second time to restore.
+(1) An anonymous visitor loads "/". (2) A signed-in editor opens a published article's
+review desk and clicks toggle-highlight, then a fresh anon visitor reloads "/". (3) The
+editor clicks toggle-highlight a second time to restore.
 
 ## Then
-(1) The hero h1 renders and the view-all link points to /articles; if the live DB
-has ≥1 highlight, the carousel + track + ≥1 card + prev/next render and the h2 reads
-"Highlights". (2) The toggle label/state flip after the action resolves, and the
-article's presence in the anon home carousel matches the NEW highlighted state
-(present ⇔ highlighted, matched by data-slug). (3) The second toggle restores the
-original state, verified both on the desk and on the anon home — so the DB ends
-exactly where it started.
+(1) The hero h1 renders, the news link points at /articles with the label "All news", and
+the grid shows 1–3 cards in which every highlighted card precedes every non-highlighted one.
+(2) The toggle label/state flip; on the anon home the article's card is consistent with the
+curated ordering: if now highlighted it is present as data-highlight="true" OR the grid is
+already full of three highlighted cards (newer highlights win the slots); if now not
+highlighted it is absent or present as data-highlight="false". The ordering invariant holds
+throughout. (3) The second toggle restores the original state, checked the same way — the
+DB ends exactly where it started.
 
-Seed-agnostic: the current highlighted state, the target published article, and its
-slug are all DERIVED from the DOM/flow — nothing is hardcoded. The auth flow reuses
-the established real Supabase sign-in (SEED_ADMIN_* is the seed editor), driven
-through the /admin/login form exactly as init-e2e-005 does — no minted session.
+Seed-agnostic: the current highlighted state, the target published article, and its slug
+are all DERIVED from the DOM/flow — nothing is hardcoded. The auth flow reuses the
+established real Supabase sign-in (SEED_ADMIN_* is the seed editor), driven through the
+/admin/login form exactly as init-e2e-005 does — no minted session.
 */
 
 import { test, expect, type Page } from "@playwright/test";
@@ -88,7 +89,7 @@ async function readHighlighted(page: Page): Promise<boolean> {
 // Playwright types the describe-level test.skip callback with fixtures only, so gate
 // via beforeEach.
 // ===========================================================================
-test.describe("home-highlights — editor-curated home carousel + toggle round-trip (desktop)", () => {
+test.describe("home-highlights — curated home news grid + toggle round-trip (desktop)", () => {
   test.beforeEach(({}, testInfo) =>
     test.skip(
       testInfo.project.name !== "desktop",
@@ -96,7 +97,7 @@ test.describe("home-highlights — editor-curated home carousel + toggle round-t
     ),
   );
 
-  test("public home (anon): hero, always-present view-all link, and a carousel iff the live DB has highlights", async ({
+  test("public home (anon): hero, news link, and a curated grid with highlights first", async ({
     page,
   }) => {
     // WHEN: an anonymous visitor loads the home page (no login).
@@ -109,39 +110,26 @@ test.describe("home-highlights — editor-curated home carousel + toggle round-t
       page.getByRole("heading", { level: 1, name: /Virgin Islands Softball Federation/i }),
     ).toBeVisible();
 
-    // The "view all articles" link ALWAYS shows and routes to /articles.
-    const viewAll = page.getByTestId("highlights-view-all");
-    await expect(viewAll).toBeVisible();
-    await expect(viewAll).toHaveAttribute("href", "/articles");
+    // The news link ALWAYS shows, names its destination, and routes to /articles.
+    const allNews = page.getByTestId("home-news-link");
+    await expect(allNews).toHaveText("All news");
+    await expect(allNews).toHaveAttribute("href", "/articles");
+    await expect(
+      page.getByRole("heading", { level: 2, name: /^Latest News$/i }),
+    ).toBeVisible();
 
-    // DERIVE the highlight state from the DOM: carousel present ⇔ ≥1 highlight.
-    const hasCarousel = (await page.getByTestId("highlights-carousel").count()) > 0;
-
-    if (hasCarousel) {
-      // ≥1 highlight → carousel + track + ≥1 card + both scroll controls, h2 "Highlights".
-      await expect(page.getByTestId("highlights-carousel")).toBeVisible();
-      await expect(page.getByTestId("highlights-track")).toBeVisible();
-      const cardCount = await page
-        .getByTestId("highlights-track")
-        .getByTestId("article-card")
-        .count();
-      expect(cardCount, "carousel renders ≥1 article-card").toBeGreaterThan(0);
-      await expect(page.getByTestId("highlights-prev")).toBeVisible();
-      await expect(page.getByTestId("highlights-next")).toBeVisible();
-      await expect(
-        page.getByRole("heading", { level: 2, name: /^Highlights$/i }),
-      ).toBeVisible();
-    } else {
-      // 0 highlights → empty note, no carousel, h2 "Latest news".
-      await expect(page.getByTestId("highlights-empty")).toBeVisible();
-      await expect(page.getByTestId("highlights-carousel")).toHaveCount(0);
-      await expect(
-        page.getByRole("heading", { level: 2, name: /^Latest news$/i }),
-      ).toBeVisible();
+    // DERIVE from the DOM: grid present ⇔ ≥1 published article.
+    if ((await page.getByTestId("home-news-grid").count()) === 0) {
+      await expect(page.getByTestId("home-news-empty")).toBeVisible();
+      return;
     }
+    const flags = await readGridFlags(page);
+    expect(flags.length, "grid renders 1–3 cards").toBeGreaterThan(0);
+    expect(flags.length).toBeLessThanOrEqual(3);
+    expectHighlightsFirst(flags);
   });
 
-  test("editor toggle-highlight round-trip: flips the flag, the anon home carousel matches, then restores", async ({
+  test("editor toggle-highlight round-trip: flips the flag, the anon home grid stays consistent, then restores", async ({
     page,
     browser,
   }) => {
@@ -201,7 +189,7 @@ test.describe("home-highlights — editor-curated home carousel + toggle round-t
       afterToggle ? /featured in the home highlights/i : /not featured/i,
     );
 
-    // ...and the ANON public home carousel presence matches the NEW state. A brand-new
+    // ...and the ANON public home grid is consistent with the NEW state. A brand-new
     // browser context guarantees no editor cookie — the real anonymous path.
     await assertHomeCardPresence(browser, slug, afterToggle);
 
@@ -223,64 +211,61 @@ test.describe("home-highlights — editor-curated home carousel + toggle round-t
       String(originalHighlighted),
     );
 
-    // ...and the anon home carousel presence is back to the original — DB restored.
+    // ...and the anon home grid is consistent with the original state — DB restored.
     await assertHomeCardPresence(browser, slug, originalHighlighted);
-  });
-
-  test("carousel scroll controls move the track and flag their ends (when a carousel renders)", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    const hasCarousel = (await page.getByTestId("highlights-carousel").count()) > 0;
-    test.skip(!hasCarousel, "no highlights in the live DB — nothing to scroll");
-
-    const track = page.getByTestId("highlights-track");
-    const prev = page.getByTestId("highlights-prev");
-    const next = page.getByTestId("highlights-next");
-    await expect(prev).toBeVisible();
-    await expect(next).toBeVisible();
-
-    // At the start, prev is aria-disabled (announced + dimmed, never natively disabled).
-    await expect(prev).toHaveAttribute("aria-disabled", "true");
-
-    // The live DB decides whether the cards overflow the track at this viewport.
-    const overflows = await track.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
-    if (!overflows) {
-      // Everything fits → both ends at once; nothing to scroll.
-      await expect(next).toHaveAttribute("aria-disabled", "true");
-      return;
-    }
-
-    // next must actually MOVE the track (a click that merely doesn't throw is how a
-    // no-op carousel once shipped), and leaving the start re-enables prev.
-    await expect(next).not.toHaveAttribute("aria-disabled");
-    await next.click();
-    await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
-    await expect(prev).not.toHaveAttribute("aria-disabled");
-
-    // prev returns to the start and re-flags it.
-    await prev.click();
-    await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeLessThanOrEqual(1);
-    await expect(prev).toHaveAttribute("aria-disabled", "true");
   });
 });
 
-// Open the public home in a FRESH anonymous context and assert the article's card
-// presence (matched by data-slug — only carousel cards render on home) equals the
-// expected highlighted state. Present ⇔ highlighted; absent ⇔ not.
+// The grid's data-highlight flags, in DOM order.
+async function readGridFlags(page: Page): Promise<boolean[]> {
+  const attrs = await page
+    .getByTestId("home-news-grid")
+    .getByTestId("article-card")
+    .evaluateAll((els) => els.map((el) => el.getAttribute("data-highlight")));
+  return attrs.map((a) => a === "true");
+}
+
+// Curated ordering: no highlighted card may follow a non-highlighted one.
+function expectHighlightsFirst(flags: boolean[]): void {
+  const firstPlain = flags.indexOf(false);
+  if (firstPlain === -1) return;
+  expect(
+    flags.slice(firstPlain).every((f) => !f),
+    `highlighted cards precede the rest (got ${JSON.stringify(flags)})`,
+  ).toBe(true);
+}
+
+// Open the public home in a FRESH anonymous context and assert the article's card is
+// consistent with its highlighted state under the curated ordering:
+//   highlighted     → present as data-highlight="true", OR the grid is already three
+//                     highlighted cards (newer highlights hold every slot);
+//   not highlighted → absent, or present as data-highlight="false".
 async function assertHomeCardPresence(
   browser: import("@playwright/test").Browser,
   slug: string,
-  shouldBePresent: boolean,
+  highlighted: boolean,
 ): Promise<void> {
   const context = await browser.newContext();
   try {
     const anon = await context.newPage();
     await anon.goto("/");
-    const card = anon.locator(
-      `[data-testid="article-card"][data-slug="${slug}"]`,
-    );
-    await expect(card).toHaveCount(shouldBePresent ? 1 : 0);
+    const flags = await readGridFlags(anon);
+    expectHighlightsFirst(flags);
+
+    const card = anon.locator(`[data-testid="article-card"][data-slug="${slug}"]`);
+    const present = (await card.count()) > 0;
+    if (highlighted) {
+      if (present) {
+        await expect(card).toHaveAttribute("data-highlight", "true");
+      } else {
+        expect(
+          flags.length === 3 && flags.every(Boolean),
+          "a highlighted article may only be missing when three newer highlights fill the grid",
+        ).toBe(true);
+      }
+    } else if (present) {
+      await expect(card).toHaveAttribute("data-highlight", "false");
+    }
   } finally {
     await context.close();
   }

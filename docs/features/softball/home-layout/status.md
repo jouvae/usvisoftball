@@ -28,7 +28,7 @@
 - The sample events (2099) and the sample clubs are still in the DB. `events-web-002/004` depend on
   them, so they get purged with fixture rework in slice 5 (§4.5 gate).
 
-## Slice 2 — hero, Get Involved, /get-involved ✅
+## Slice 2 — hero, Get Involved, /get-involved ✅ (`c9f29a1`)
 - `components/ui/home-hero.tsx`: no-photo hero (navy, faint island outlines, corner slash) with the
   two-tone H1, whose accessible name is "U.S. Virgin Islands Softball Federation". The tagline and blurb
   follow. There are two CTAs: Teams/Events when their flags are on, otherwise **News + Get involved**,
@@ -46,5 +46,25 @@
   home-highlights anon + carousel tests pass (the editor round-trip test wasn't run because it writes to the DB).
 - Verified visually at 1440/820/390.
 
+## Slice 3 — curated news grid ✅
+- `lib/articles.ts`: `listHomeNews(limit = 3)` is one query (`is_highlight desc, published_at desc`,
+  limit). It returns items with `isHighlight` and replaces `listHighlightedArticles`, which had no
+  other caller.
+- Home "Latest News" section: SectionHeader with "All news →" (`home-news-link`) above a
+  `home-news-grid` of ≤3 `ArticleCard`s. On sm the third card spans both columns. The empty state is
+  `home-news-empty`.
+- `ArticleCard` gains `highlight` (emits `data-highlight`) and `headingLevel` (h3 inside a section;
+  the /articles feed stays h2).
+- `components/client/highlights-carousel.tsx` deleted (no remaining users).
+- No `priority` on news covers. The grid sits below the fold even with a no-photo hero, so the
+  above-the-fold h1 is the LCP candidate (a deliberate deviation from guide §2.5).
+- `home-highlights.spec.ts` was rewritten for the grid. It checks the ordering invariant (highlights
+  first) and a round-trip check that holds under curation (a highlighted article may be missing only
+  when 3 newer highlights fill the grid). The carousel scroll test was removed.
+- Ran against a prod build: home-highlights (incl. the editor round-trip, which restores the flag),
+  home-hero-involved, shell-mvp, init-web-009 and articles/*. **64 passed, 8 skipped.**
+- Visual check at 1440/820/390. On 820 the spanning third card crops the top of its typographic
+  cover; acceptable, and real photos will crop more gracefully.
+
 ## Next
-Slice 3: curated 3-up news grid (`listHomeNews`), retire the carousel, SectionHeader on news.
+Slice 4: `home_stats` migration + `lib/stats.ts` + admin editor + the stats strip.

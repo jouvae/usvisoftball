@@ -7,6 +7,12 @@ export type ArticleCardProps = {
   article: ArticleListItem;
   // Above-the-fold cards get `priority` (no lazy-load); below-fold cards do not.
   priority?: boolean;
+  // Set by curated surfaces (the home news grid) to mark editor-highlighted cards via
+  // data-highlight. Omitted elsewhere → no attribute.
+  highlight?: boolean;
+  // The headline's heading level: h2 on the /articles feed (under the page h1), h3 where
+  // the card sits inside a titled section (the home news grid).
+  headingLevel?: "h2" | "h3";
   className?: string;
 };
 
@@ -17,6 +23,8 @@ export type ArticleCardProps = {
 export function ArticleCard({
   article,
   priority = false,
+  highlight,
+  headingLevel: Heading = "h2",
   className = "",
 }: ArticleCardProps) {
   const {
@@ -33,6 +41,7 @@ export function ArticleCard({
     <li
       data-testid="article-card"
       data-slug={slug}
+      data-highlight={highlight === undefined ? undefined : String(highlight)}
       className={`group relative isolate flex flex-col justify-end overflow-hidden rounded-2xl bg-slate-900 px-6 pt-52 pb-6 ${className}`}
     >
       {coverImageUrl ? (
@@ -66,7 +75,7 @@ export function ArticleCard({
         </time>
       </div>
 
-      <h2
+      <Heading
         data-testid="article-card-headline"
         className="mt-2 font-display text-xl font-bold leading-tight tracking-tight text-white"
       >
@@ -78,7 +87,7 @@ export function ArticleCard({
           <span className="absolute inset-0" />
           {title}
         </Link>
-      </h2>
+      </Heading>
     </li>
   );
 }
