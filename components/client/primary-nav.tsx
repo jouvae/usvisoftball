@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavLink } from "@/components/ui/nav-link";
-import { PAYPAL_DONATE_URL } from "@/lib/flags";
+import { PAYPAL_DONATE_URL, SHOP_ENABLED } from "@/lib/flags";
 
-// MVP nav: logo (SiteBrand, → home) on the left; Articles · About · Donate on the right.
-// Teams, Events, Shop are dormant for launch (flagged off) and intentionally absent here.
-// Donate is an external CTA to PayPal (opens in a new tab).
+// Nav: logo (SiteBrand, → home) on the left; Articles · About · [Shop] · Donate on the
+// right. Teams/Events stay dormant (flagged off). Shop shows ONLY when SHOP_ENABLED — it's
+// a redesign placeholder until real commerce lands. Donate is an external CTA to PayPal.
 const NAV_ITEMS = [
   { href: "/articles", label: "Articles", testId: "nav-link-articles" },
   { href: "/about", label: "About", testId: "nav-link-about" },
+  ...(SHOP_ENABLED
+    ? [{ href: "/shop", label: "Shop", testId: "nav-link-shop" }]
+    : []),
 ] as const;
 
 export function PrimaryNav({ className = "" }: { className?: string }) {
@@ -26,7 +29,7 @@ export function PrimaryNav({ className = "" }: { className?: string }) {
         aria-controls="primary-nav"
         aria-label="Toggle navigation"
         onClick={() => setOpen((v) => !v)}
-        className="md:hidden inline-flex items-center rounded border border-header-muted/40 px-3 py-2 text-sm font-medium uppercase tracking-wide text-header-foreground"
+        className="md:hidden inline-flex items-center rounded-md border border-border px-3 py-2 text-sm font-medium uppercase tracking-wide text-header-foreground hover:bg-surface"
       >
         Menu
       </button>

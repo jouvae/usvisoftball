@@ -36,12 +36,18 @@ import { PAYPAL_DONATE_URL } from "@/lib/flags";
 // The nav links are always attached, but they collapse behind the mobile toggle
 // below the md breakpoint — so composition (count/href/attributes) is asserted
 // on the attached elements, which holds at every viewport.
-const PRESENT = ["nav-link-articles", "nav-link-about", "nav-link-donate"];
+// Shop is a redesign nav item, flag-gated by NEXT_PUBLIC_SHOP_ENABLED. The dev/test
+// server enables it (.env.local), so it is present here; prod leaves it off.
+const PRESENT = [
+  "nav-link-articles",
+  "nav-link-about",
+  "nav-link-shop",
+  "nav-link-donate",
+];
 const REMOVED = [
   "nav-link-news",
   "nav-link-teams",
   "nav-link-events",
-  "nav-link-shop",
 ];
 
 // ---------------------------------------------------------------------------
@@ -52,7 +58,7 @@ test.describe("shell-mvp — primary nav", () => {
     await page.goto("/");
   });
 
-  test("shows exactly Articles · About · Donate and none of the removed items", async ({
+  test("shows Articles · About · Shop · Donate and none of the removed items", async ({
     page,
   }) => {
     for (const testId of PRESENT) {

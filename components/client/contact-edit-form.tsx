@@ -94,7 +94,7 @@ export function ContactEditForm({ contact }: { contact: ContactInfo | null }) {
         type="submit"
         disabled={pending}
         data-testid="contact-save"
-        className="w-fit rounded-md bg-brand px-4 py-2 font-medium text-header-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
+        className="w-fit rounded-md bg-brand px-4 py-2 font-medium text-brand-foreground outline-focus hover:bg-brand-hover focus:outline-2 disabled:opacity-60"
       >
         {pending ? "Saving…" : "Save contact info"}
       </button>
