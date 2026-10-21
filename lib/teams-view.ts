@@ -33,15 +33,27 @@ export function safePhotoHref(url: string): string {
   return safeStoredImageHref(url);
 }
 
-// A member team / club.
+// 'club' = an island member club; 'national' = a USVI national team (no single island).
+// Mirrors the 0024 CHECK.
+export type TeamKind = "club" | "national";
+
+export const TEAM_KIND_LABELS: Record<TeamKind, string> = {
+  national: "National team",
+  club: "Club",
+};
+
+// A member club or a national team.
 export interface Team {
   id: string;
   name: string;
   slug: string; // URL-safe key for the /teams/[slug] detail page
-  island: Island;
+  kind: TeamKind;
+  shortName: string; // '' → use name
+  island: Island | null; // null only for national teams (0024 CHECK)
   division: string; // free text: Men's / Women's / Coed / Youth
   description: string;
   logoUrl: string;
+  coverImageUrl: string; // '' → no-photo variant
   homeVenue: string;
   foundedYear: number | null;
   sortOrder: number;

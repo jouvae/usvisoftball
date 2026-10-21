@@ -10,6 +10,7 @@ import {
   getTeamLogoUrl,
   getTeamOwnedPhotoUrls,
   type Island,
+  type TeamKind,
 } from "@/lib/teams";
 import { ISLAND_LABELS } from "@/lib/teams-view";
 import { BoardPhotoUrlError } from "@/lib/board";
@@ -67,7 +68,10 @@ function readTeamFields(formData: FormData):
   | { error: string }
   | {
       name: string;
-      island: Island;
+      kind: TeamKind;
+      shortName: string;
+      island: Island | null;
+      coverImageUrl: string | null;
       division: string;
       description: string;
       homeVenue: string;
@@ -75,7 +79,12 @@ function readTeamFields(formData: FormData):
       sortOrder: number;
     } {
   const name = String(formData.get("name") ?? "").trim();
-  const island = String(formData.get("island") ?? "").trim();
+  const kindRaw = String(formData.get("kind") ?? "club").trim();
+  const shortName = String(formData.get("shortName") ?? "").trim();
+  const islandRaw = String(formData.get("island") ?? "").trim();
+  // Cover: a local /public path or board-photos Storage URL; '' clears it. The allowlist is
+  // enforced in lib/teams (assertBoardPhotoUrlAllowed → BoardPhotoUrlError).
+  const coverImageUrl = String(formData.get("coverImageUrl") ?? "").trim() || null;
   const division = String(formData.get("division") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const homeVenue = String(formData.get("homeVenue") ?? "").trim();
@@ -83,13 +92,25 @@ function readTeamFields(formData: FormData):
   const sortOrderRaw = parseIntOrNull(String(formData.get("sortOrder") ?? ""));
 
   if (!name) return { error: "Team name is required." };
-  if (!isValidIsland(island)) return { error: "Choose a valid island." };
+  if (kindRaw !== "club" && kindRaw !== "national") return { error: "Choose a team type." };
+  const kind: TeamKind = kindRaw;
+  // A club needs an island (0024 CHECK); a national team may leave it blank ('' → null).
+  let island: Island | null = null;
+  if (islandRaw !== "") {
+    if (!isValidIsland(islandRaw)) return { error: "Choose a valid island." };
+    island = islandRaw;
+  } else if (kind === "club") {
+    return { error: "A club needs an island." };
+  }
   if (foundedYear === undefined) return { error: "Founded year must be a number." };
   if (sortOrderRaw === undefined) return { error: "Sort order must be a number." };
 
   return {
     name,
+    kind,
+    shortName,
     island,
+    coverImageUrl,
     division,
     description,
     homeVenue,

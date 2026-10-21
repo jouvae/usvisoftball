@@ -66,7 +66,7 @@
 - Visual check at 1440/820/390. On 820 the spanning third card crops the top of its typographic
   cover; acceptable, and real photos will crop more gracefully.
 
-## Slice 4 — editor-managed stats strip ✅
+## Slice 4 — editor-managed stats strip ✅ (`9bb555f`)
 - **`0023_home_stats.sql`, applied to the shared DB (= prod) on 2026-10-21, with 0 rows.** Every stat has the same
   shape, enforced by CHECKs: label ≤40, value ≤12, detail ≤60, an icon enum, a required `as_of`, and
   `source_url` https-only. `is_published` defaults to false. RLS: anon sees published rows only;
@@ -87,6 +87,32 @@
 - ⏭ **Content:** an editor needs to enter and publish the real, verified figures. The comp's
   "No. 32 WBSC" and "2026 CAC Silver" are still unverified.
 
-## Next
-Slice 5: teams `kind`/cover + events cover migrations, `getNextEvent`, the home Teams + Event
-sections, the national-first `/teams`, then the §4.5 purge gate and the flag flip.
+## Slice 5a — national teams, event band, /teams ✅
+- **Migrations applied to the shared DB (= prod) on 2026-10-21:**
+  - `0024_team_kind.sql`: `teams.kind` ('club'|'national', default club), `short_name`, `cover_image_url`;
+    `island` becomes nullable, with a CHECK that a club still needs one.
+  - `0025_event_cover.sql`: `events.cover_image_url`.
+  - Existing rows are unchanged.
+- **Content inserted:** *Women's National Team* (short name "Women's Team") and *U18 Girls' National
+  Team* ("U18s"), kind national, no island, with drafted descriptions. Hidden in prod while the Teams
+  flag is off.
+- Code: `listTeams(client, { kind })`. `groupTeamsByIsland` returns clubs only. Team type/admin form
+  gain type, short name and cover path; an island is optional for national teams. Events gain a cover
+  (type + admin form) and `getNextEvent(today)`, which orders by start_date, skips undated events and
+  returns null when none is upcoming.
+- Home: `HomeTeamsSection` (national teams, photo or monogram, navy panel, corner slash, whole-card
+  link, "Meet the …") and `HomeEventBand` (next event, dates + venue, "Event details", stripe edge,
+  optional cover). Both appear only when their flag is on and they have data.
+- `/teams`: a "National teams" group leads (`teams-national`), followed by the island clubs.
+- The hero test is now flag-aware.
+- Verified with flags ON at 1440/390: home + /teams.
+
+## ⛔ Slice 5b — blocked on confirmation: sample-data purge + flag flip (§4.5)
+With flags ON, the teams/events specs fail because they **hardcode the sample seed**: 5 teams,
+3 events, sample slugs (teams-web-001, teams-e2e-003, events-web-001/002/004, events-e2e-003).
+Steps:
+1. Rework those specs to seed + clean up their own fixtures (no dependency on sample rows).
+2. Delete the sample rows: 5 clubs, 17 team_players, 3 sample events, 9 event_teams links.
+   Neutralise the seed inserts in 0013/0014/0017/0019 so a replay can't bring them back.
+3. Set `NEXT_PUBLIC_TEAMS_ENABLED=true` / `NEXT_PUBLIC_EVENTS_ENABLED=true` for the Fly build and
+   redeploy. They're inlined at build time.

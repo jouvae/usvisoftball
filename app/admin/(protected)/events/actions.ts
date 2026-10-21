@@ -78,6 +78,7 @@ type EventFields =
       island: EventIsland | null;
       startDate: string | null;
       endDate: string | null;
+      coverImageUrl: string | null;
       sortOrder: number;
     };
 
@@ -89,6 +90,9 @@ function readEventFields(formData: FormData): EventFields {
   const startDate = parseDate(String(formData.get("startDate") ?? ""));
   const endDate = parseDate(String(formData.get("endDate") ?? ""));
   const sortOrder = parseSortOrder(String(formData.get("sortOrder") ?? ""));
+  // Cover (home event band): a local /public path or board-photos Storage URL; '' clears it.
+  // The allowlist is enforced in lib/events (assertBoardPhotoUrlAllowed → BoardPhotoUrlError).
+  const coverImageUrl = String(formData.get("coverImageUrl") ?? "").trim() || null;
 
   if (!name) return { error: "Event name is required." };
   // '' island = territory-wide (null); any non-empty value must be a valid island.
@@ -103,7 +107,7 @@ function readEventFields(formData: FormData): EventFields {
   }
   if (sortOrder === undefined) return { error: "Sort order must be a number." };
 
-  return { name, description, venue, island, startDate, endDate, sortOrder };
+  return { name, description, venue, island, startDate, endDate, coverImageUrl, sortOrder };
 }
 
 export async function createEventAction(

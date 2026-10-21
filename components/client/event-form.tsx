@@ -185,6 +185,21 @@ export function EventForm({
         />
       </label>
 
+      <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+        Cover photo path
+        <span className="text-xs font-normal text-muted">
+          Optional action photo for the home page event band, e.g. /events/pan-am.jpg
+        </span>
+        <input
+          type="text"
+          name="coverImageUrl"
+          placeholder="/events/event-photo.jpg"
+          defaultValue={event?.coverImageUrl ?? ""}
+          data-testid="event-cover"
+          className="rounded-md border border-border bg-background px-3 py-2 text-foreground outline-focus focus:outline-2"
+        />
+      </label>
+
       {state?.error ? (
         <p data-testid={errorTestId} className="text-sm text-muted">
           {state.error}

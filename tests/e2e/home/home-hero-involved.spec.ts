@@ -20,8 +20,9 @@ references:
 The home renders <HomeHero> (data-testid home-hero) and <GetInvolvedSection>
 (home-involved). The hero has one <h1> whose accessible name is the full federation name
 (visible "SOFTBALL / FEDERATION" + sr-only "U.S. Virgin Islands"), the tagline, and at most
-two CTAs. While TEAMS/EVENTS flags are off (.env.local) the CTAs fall back to News
-(hero-articles-cta → /articles) and Get Involved (hero-involved-cta → /get-involved). The
+two CTAs: Teams (hero-teams-cta → /teams) and Events (hero-events-cta → /events) while
+their flags are on, else News (hero-articles-cta → /articles) and Get Involved
+(hero-involved-cta → /get-involved). The
 section has three audience cards (involved-card-{athletes|volunteers|support}), each with ONE
 link (involved-cta-*). /get-involved has three anchored sections. The sticky header carries
 data-hero="true" only on "/" at scroll-top.
@@ -32,7 +33,7 @@ scroll the home page, and they load /articles.
 
 ## Then
 (1) Exactly one h1, named "U.S. Virgin Islands Softball Federation"; the tagline reads
-"From the Virgin Islands to the World."; ≤2 hero CTAs with the fallback hrefs; no Support CTA
+"From the Virgin Islands to the World."; ≤2 hero CTAs with the flag-appropriate hrefs; no Support CTA
 in the hero; three involved cards, each with exactly one link — internal ones point at
 /get-involved#athletes / #volunteers, the support one is an external PayPal anchor
 (target=_blank, rel noopener) announced as "opens PayPal"; the section link names its
@@ -42,7 +43,7 @@ scrolling, and "false" on /articles.
 */
 
 import { test, expect } from "@playwright/test";
-import { PAYPAL_DONATE_URL } from "@/lib/flags";
+import { EVENTS_ENABLED, PAYPAL_DONATE_URL, TEAMS_ENABLED } from "@/lib/flags";
 
 test.describe("home-hero-involved — hero", () => {
   test.beforeEach(async ({ page }) => {
@@ -59,16 +60,25 @@ test.describe("home-hero-involved — hero", () => {
     );
   });
 
-  test("at most two CTAs, flag-off fallbacks, and no Support CTA in the hero", async ({
+  test("at most two CTAs, flag-aware targets, and no Support CTA in the hero", async ({
     page,
   }) => {
     const hero = page.getByTestId("home-hero");
     await expect(hero.getByRole("link")).toHaveCount(2);
-    await expect(page.getByTestId("hero-articles-cta")).toHaveAttribute("href", "/articles");
-    await expect(page.getByTestId("hero-involved-cta")).toHaveAttribute(
-      "href",
-      "/get-involved",
-    );
+    // Teams/Events when their flags are on; otherwise the News / Get Involved fallbacks.
+    if (TEAMS_ENABLED) {
+      await expect(page.getByTestId("hero-teams-cta")).toHaveAttribute("href", "/teams");
+    } else {
+      await expect(page.getByTestId("hero-articles-cta")).toHaveAttribute("href", "/articles");
+    }
+    if (EVENTS_ENABLED) {
+      await expect(page.getByTestId("hero-events-cta")).toHaveAttribute("href", "/events");
+    } else {
+      await expect(page.getByTestId("hero-involved-cta")).toHaveAttribute(
+        "href",
+        "/get-involved",
+      );
+    }
     await expect(hero.locator(`a[href="${PAYPAL_DONATE_URL}"]`)).toHaveCount(0);
   });
 });

@@ -90,6 +90,7 @@ async function readSeed(): Promise<Expected> {
     startDate: r.start_date,
     endDate: r.end_date,
     logoUrl: r.logo_url,
+    coverImageUrl: "", // not read here — irrelevant to the directory split/sort
     sortOrder: r.sort_order,
   }));
 

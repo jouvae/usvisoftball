@@ -34,6 +34,7 @@ export interface FederationEvent {
   startDate: string | null; // ISO date 'YYYY-MM-DD' (no time) or null
   endDate: string | null;
   logoUrl: string;
+  coverImageUrl: string; // '' → the home event band's no-photo variant (0025)
   sortOrder: number;
 }
 

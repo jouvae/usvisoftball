@@ -38,7 +38,7 @@ export default async function TeamDetailPage({
         </h1>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <span data-testid="team-detail-island" className="font-semibold">
-            {ISLAND_LABELS[team.island]}
+            {team.island ? ISLAND_LABELS[team.island] : "U.S. Virgin Islands"}
           </span>
           {team.division ? (
             <span data-testid="team-detail-division">· {team.division}</span>
