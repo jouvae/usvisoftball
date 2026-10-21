@@ -7,6 +7,14 @@ app = 'usvi-softball'
 primary_region = 'ewr'
 
 [build]
+
+# Build-time feature flags (Dockerfile ARGs; `next build` inlines NEXT_PUBLIC_*). Teams +
+# Events went live with the home-layout feature (docs/features/softball/home-layout/).
+# Set a value to "false" (or delete it) and redeploy to switch a section off again.
+[build.args]
+  NEXT_PUBLIC_TEAMS_ENABLED = "true"
+  NEXT_PUBLIC_EVENTS_ENABLED = "true"
+
 [http_service]
   internal_port = 8080
   force_https = true

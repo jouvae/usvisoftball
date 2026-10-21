@@ -128,8 +128,17 @@
 - ⚠️ Once the flags are live in prod, any e2e run against the shared DB briefly shows the E2E
   fixtures on the public site. The real fix is still a non-prod Supabase project for e2e.
 
-## Next — step 3 (needs PR #1 merge)
-Set `NEXT_PUBLIC_TEAMS_ENABLED=true` / `NEXT_PUBLIC_EVENTS_ENABLED=true` for the Fly build
-(Dockerfile ARG/ENV or fly.toml `[build.args]`; they're inlined at build time) and deploy via `main`.
+## Step 3 — flag flip prepared (goes live on merge to `main`)
+- `Dockerfile`: builder-stage `ARG NEXT_PUBLIC_TEAMS_ENABLED=false` / `ARG NEXT_PUBLIC_EVENTS_ENABLED=false`
+  → `ENV`, so `next build` inlines them. The default is off.
+- `fly.toml`: `[build.args]` sets both to `"true"`. `flyctl deploy --local-only` (the CI deploy step)
+  passes `[build.args]` to the Docker build. To roll back, set a flag to "false" and redeploy.
+- Verified with a local `docker build` using the same args, run with the runtime env: `/`, `/teams`,
+  `/events`, the Pan Am event page, `/teams/womens-national-team` and `/get-involved` all return 200.
+  Home renders hero, teams, event, news and involved (stats is hidden because nothing is published);
+  the nav shows Teams and Events.
+- **Go-live = merge PR #1 → `main`.** CI then deploys. The DB side (0023–0025, purge, national
+  teams, Pan Am event) is already in place and is compatible with the old `main` code in the meantime.
+
 Content still owed: real stats (`/admin/stats`), national-team cover photos, confirmed Pan Am dates,
 and a review of the drafted team/Get Involved copy.
