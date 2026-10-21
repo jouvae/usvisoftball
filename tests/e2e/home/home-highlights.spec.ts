@@ -227,22 +227,41 @@ test.describe("home-highlights — editor-curated home carousel + toggle round-t
     await assertHomeCardPresence(browser, slug, originalHighlighted);
   });
 
-  test("carousel scroll controls are present and clickable without error (when a carousel renders)", async ({
+  test("carousel scroll controls move the track and flag their ends (when a carousel renders)", async ({
     page,
   }) => {
     await page.goto("/");
     const hasCarousel = (await page.getByTestId("highlights-carousel").count()) > 0;
     test.skip(!hasCarousel, "no highlights in the live DB — nothing to scroll");
 
+    const track = page.getByTestId("highlights-track");
     const prev = page.getByTestId("highlights-prev");
     const next = page.getByTestId("highlights-next");
-    await expect(prev).toBeEnabled();
-    await expect(next).toBeEnabled();
-    // Smoke only — the buttons scrollBy on the track; assert they click without
-    // throwing, not exact pixel offsets (a native scroll-snap list).
+    await expect(prev).toBeVisible();
+    await expect(next).toBeVisible();
+
+    // At the start, prev is aria-disabled (announced + dimmed, never natively disabled).
+    await expect(prev).toHaveAttribute("aria-disabled", "true");
+
+    // The live DB decides whether the cards overflow the track at this viewport.
+    const overflows = await track.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    if (!overflows) {
+      // Everything fits → both ends at once; nothing to scroll.
+      await expect(next).toHaveAttribute("aria-disabled", "true");
+      return;
+    }
+
+    // next must actually MOVE the track (a click that merely doesn't throw is how a
+    // no-op carousel once shipped), and leaving the start re-enables prev.
+    await expect(next).not.toHaveAttribute("aria-disabled");
     await next.click();
+    await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+    await expect(prev).not.toHaveAttribute("aria-disabled");
+
+    // prev returns to the start and re-flags it.
     await prev.click();
-    await expect(page.getByTestId("highlights-track")).toBeVisible();
+    await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeLessThanOrEqual(1);
+    await expect(prev).toHaveAttribute("aria-disabled", "true");
   });
 });
 

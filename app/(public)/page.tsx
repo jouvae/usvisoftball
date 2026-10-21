@@ -69,7 +69,9 @@ export default async function Home() {
                 key={article.id}
                 article={article}
                 priority={index === 0}
-                className="w-[85vw] shrink-0 snap-start sm:w-80"
+                // Whole cards per view (1 + peek on phones, 2 on tablets, 3 on desktop) —
+                // the 1.5rem/3rem terms are the track's gap-6 between visible cards.
+                className="w-[85%] shrink-0 snap-start sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
               />
             ))}
           </HighlightsCarousel>
