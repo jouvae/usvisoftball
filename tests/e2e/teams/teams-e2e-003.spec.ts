@@ -14,8 +14,8 @@ references:
   - lib/teams.ts (createTeam/updateTeam/deleteTeam; slug stable; getTeamOwnedPhotoUrls)
   - lib/board-photos.ts (uploadBoardPhoto: declared-type + magic-byte validation; reap by URL)
   - components/ui/teams-directory.tsx (public /teams: team-island-group/-name, team-card, team-logo)
-  - supabase/migrations/0013_teams.sql (teams; 5 seeded rows; public-read)
-  - supabase/migrations/0014_team_players.sql (team_players; FK on delete cascade; 17 seeded)
+  - supabase/migrations/0013_teams.sql (teams; public-read)
+  - supabase/migrations/0014_team_players.sql (team_players; FK on delete cascade)
   - supabase/migrations/0015_teams_admin.sql (editor-only teams write RLS)
   - supabase/migrations/0009_board_photos_storage.sql (board-photos bucket, editor-only write)
 ---
@@ -35,8 +35,8 @@ The teams admin-CRUD slice, all writes through the real editor session (0015 RLS
 
 MANDATORY TEARDOWN (shared prod DB + Storage): every team uses a unique marker name. afterAll
 (service key) collects each marker team's logo + players' photo objects, DELETEs marker teams
-(cascade players), removes the collected board-photos objects, then asserts: teams back to the
-5 seeded rows, 0 marker teams, team_players back to 17, and none of the collected objects remain
+(cascade players), removes the collected board-photos objects, then asserts: teams and team_players
+back to the BASELINE counts captured in beforeAll, 0 marker teams, and none of the collected objects remain
 (LIST api). Desktop-gated. The service-key admin client is teardown + out-of-band verification
 ONLY — every app write goes through the real editor session.
 */
@@ -57,8 +57,18 @@ const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SERVICE_KEY = process.env.SUPABASE_KEY;
 
 const MARKER_PREFIX = "e2e-003-marker";
-const SEEDED_TEAM_COUNT = 5;
-const SEEDED_PLAYER_COUNT = 17;
+// Row counts captured in beforeAll (after clearing stale markers): the DB holds real teams
+// and other specs' fixtures, so teardown proves "back to where we started", not a fixed number.
+let baselineTeams = -1;
+let baselinePlayers = -1;
+
+async function countRows(table: "teams" | "team_players"): Promise<number> {
+  const { count, error } = await createAdminClient()
+    .from(table)
+    .select("*", { count: "exact", head: true });
+  if (error) throw error;
+  return count ?? 0;
+}
 const PHOTO_PUBLIC_BASE = `${(SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/${BOARD_PHOTOS_BUCKET}/`;
 
 // A minimal but genuine 1x1 PNG (correct magic bytes) — passes the magic-byte sniff.
@@ -254,6 +264,8 @@ test.describe("teams-e2e-003 — teams admin CRUD w/ logo + cascade/reap + authz
   test.beforeAll(async ({}, testInfo) => {
     if (!isDesktop(testInfo)) return;
     await deleteMarkerData();
+    baselineTeams = await countRows("teams");
+    baselinePlayers = await countRows("team_players");
   });
 
   test.afterAll(async ({}, testInfo) => {
@@ -272,16 +284,14 @@ test.describe("teams-e2e-003 — teams admin CRUD w/ logo + cascade/reap + authz
       .from("teams")
       .select("*", { count: "exact", head: true });
     if (tErr) throw tErr;
-    expect(teamsTotal, "TEARDOWN: teams back to the 5 seeded rows").toBe(
-      SEEDED_TEAM_COUNT,
-    );
+    expect(teamsTotal, "TEARDOWN: teams back to the baseline count").toBe(baselineTeams);
 
     const { count: playersTotal, error: pErr } = await admin
       .from("team_players")
       .select("*", { count: "exact", head: true });
     if (pErr) throw pErr;
-    expect(playersTotal, "TEARDOWN: team_players back to 17 seeded rows").toBe(
-      SEEDED_PLAYER_COUNT,
+    expect(playersTotal, "TEARDOWN: team_players back to the baseline count").toBe(
+      baselinePlayers,
     );
 
     for (const key of reapedKeys) {

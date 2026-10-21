@@ -39,26 +39,6 @@ create policy team_players_public_read on public.team_players
   for select using (true);
 
 -- Seed a small roster per team, resolving team_id by slug (idempotent on (team_id, name)).
-insert into public.team_players (team_id, name, jersey_number, position, bats_throws, sort_order)
-select t.id, p.name, p.num, p.pos, p.bt, p.sort
-from public.teams t
-join (values
-  ('frenchtown-sluggers',    'Malik Prince',       7,  'SS', 'R/R', 10),
-  ('frenchtown-sluggers',    'Andre Petersen',     12, 'P',  'L/L', 20),
-  ('frenchtown-sluggers',    'Tyrone Baptiste',    24, 'C',  'R/R', 30),
-  ('frenchtown-sluggers',    'Jamal Herbert',      3,  'CF', 'L/R', 40),
-  ('charlotte-amalie-storm', 'Keisha Williams',    9,  'P',  'R/R', 10),
-  ('charlotte-amalie-storm', 'Tamara Joseph',      5,  'SS', 'R/R', 20),
-  ('charlotte-amalie-storm', 'Nadia Charles',      21, '1B', 'L/L', 30),
-  ('cruz-bay-waves',         'Devon Sewer',        10, 'OF', 'R/R', 10),
-  ('cruz-bay-waves',         'Alicia George',      14, '2B', 'R/R', 20),
-  ('cruz-bay-waves',         'Marcus Penn',        6,  '3B', 'R/R', 30),
-  ('christiansted-crushers', 'Rueben Santos',      4,  'SS', 'R/R', 10),
-  ('christiansted-crushers', 'Elias Gomez',        18, 'P',  'R/R', 20),
-  ('christiansted-crushers', 'Josiah Bryan',       22, '1B', 'L/L', 30),
-  ('christiansted-crushers', 'Nathaniel Frett',    8,  'C',  'R/R', 40),
-  ('frederiksted-fire',      'Shanice Moorehead',  11, 'P',  'L/R', 10),
-  ('frederiksted-fire',      'Kwame Richardson',   2,  '2B', 'R/R', 20),
-  ('frederiksted-fire',      'Latoya Benjamin',    16, 'OF', 'R/R', 30)
-) as p(tslug, name, num, pos, bt, sort) on p.tslug = t.slug
-on conflict (team_id, name) do nothing;
+-- Sample seed rows REMOVED (home-layout slice 5b, 2026-10-21): the clearly-sample roster players
+-- were purged from the shared DB, and this insert was dropped so a replay can't restore them.
+-- e2e specs seed their own fixtures (tests/support/sports-fixtures.ts).

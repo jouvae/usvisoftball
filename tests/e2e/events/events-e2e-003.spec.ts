@@ -15,7 +15,7 @@ references:
   - lib/board-photos.ts (uploadBoardPhoto: declared-type + magic-byte validation; reap by URL)
   - components/ui/events-directory.tsx (public /events: events-upcoming/-past, event-card, event-name link)
   - app/(public)/events/[slug]/page.tsx (event-detail + event-detail-logo)
-  - supabase/migrations/0017_events.sql (events; 3 seeded rows; public-read)
+  - supabase/migrations/0017_events.sql (events; public-read)
   - supabase/migrations/0018_events_admin.sql (editor-only events write RLS)
   - supabase/migrations/0009_board_photos_storage.sql (board-photos bucket, editor-only write)
 ---
@@ -32,13 +32,13 @@ The events admin-CRUD slice, all writes through the real editor session (0018 RL
 (c) A magic-byte-SPOOFED logo upload is rejected with event-add-error, creates NO event, and —
     validation runs BEFORE upload — leaves NO new Storage object.
 (d) Deleting an event removes it from /events and reaps its logo Storage object (GONE via the
-    LIST api); the 3 seeded events remain.
+    LIST api); every non-marker event remains.
 (e) A CONTRIBUTOR is redirected /admin/events → /admin; ANON → /admin/login; a direct PostgREST
     INSERT/UPDATE/DELETE on `events` with the contributor JWT / anon key is denied (RLS/grant).
 
 MANDATORY TEARDOWN (shared prod DB + Storage): every event uses a unique marker name. afterAll
 (service key) collects each marker event's logo object, DELETEs marker events, removes the
-collected board-photos objects, then asserts: events back to the 3 seeded rows, 0 marker events,
+collected board-photos objects, then asserts: events back to the BASELINE count captured in beforeAll, 0 marker events,
 and none of the collected objects remain (LIST api). Desktop-gated. The service-key admin client
 is teardown + out-of-band verification ONLY — every app write goes through the real editor session.
 */
@@ -59,7 +59,17 @@ const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SERVICE_KEY = process.env.SUPABASE_KEY;
 
 const MARKER_PREFIX = "e2e-003-marker";
-const SEEDED_EVENT_COUNT = 3;
+// Counts captured in beforeAll (after clearing stale markers): the DB holds real events and
+// other specs' fixtures, so assertions prove "unchanged", not a fixed number.
+let baselineEvents = -1;
+
+async function countEvents(nonMarkerOnly = false): Promise<number> {
+  let q = createAdminClient().from("events").select("*", { count: "exact", head: true });
+  if (nonMarkerOnly) q = q.not("name", "like", `${MARKER_PREFIX}%`);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
 const PHOTO_PUBLIC_BASE = `${(SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/${BOARD_PHOTOS_BUCKET}/`;
 
 // A minimal but genuine 1x1 PNG (correct magic bytes) — passes the magic-byte sniff.
@@ -253,6 +263,7 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
   test.beforeAll(async ({}, testInfo) => {
     if (!isDesktop(testInfo)) return;
     await deleteMarkerData();
+    baselineEvents = await countEvents();
   });
 
   test.afterAll(async ({}, testInfo) => {
@@ -271,9 +282,7 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
       .from("events")
       .select("*", { count: "exact", head: true });
     if (tErr) throw tErr;
-    expect(eventsTotal, "TEARDOWN: events back to the 3 seeded rows").toBe(
-      SEEDED_EVENT_COUNT,
-    );
+    expect(eventsTotal, "TEARDOWN: events back to the baseline count").toBe(baselineEvents);
 
     for (const key of reapedKeys) {
       expect(
@@ -377,7 +386,7 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
     ).toBe(false);
   });
 
-  test("(d) deleting an event removes it from /events and reaps its logo object; seeded events remain", async ({
+  test("(d) deleting an event removes it from /events and reaps its logo object; other events remain", async ({
     page,
   }) => {
     const name = `${MARKER_PREFIX} D ${randomUUID()}`;
@@ -417,15 +426,11 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
       .poll(async () => objectExists(logoKey!), { timeout: 10_000 })
       .toBe(false);
 
-    // …and the 3 seeded (non-marker) events remain untouched. (Tests run serially against one
-    // DB; earlier tests' marker rows are only reaped in afterAll, so count NON-marker rows.)
-    const admin = createAdminClient();
-    const { count: seededLeft, error } = await admin
-      .from("events")
-      .select("*", { count: "exact", head: true })
-      .not("name", "like", `${MARKER_PREFIX}%`);
-    if (error) throw error;
-    expect(seededLeft, "the 3 seeded events remain after the delete").toBe(SEEDED_EVENT_COUNT);
+    // …and every non-marker event remains untouched. (Tests run serially against one DB;
+    // earlier tests' marker rows are only reaped in afterAll, so count NON-marker rows.)
+    expect(await countEvents(true), "non-marker events unchanged after the delete").toBe(
+      baselineEvents,
+    );
   });
 
   test("(e) contributor → /admin, anon → /admin/login, and direct PostgREST writes on events are denied", async ({

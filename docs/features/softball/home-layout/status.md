@@ -87,7 +87,7 @@
 - ⏭ **Content:** an editor needs to enter and publish the real, verified figures. The comp's
   "No. 32 WBSC" and "2026 CAC Silver" are still unverified.
 
-## Slice 5a — national teams, event band, /teams ✅
+## Slice 5a — national teams, event band, /teams ✅ (`08f8da4`)
 - **Migrations applied to the shared DB (= prod) on 2026-10-21:**
   - `0024_team_kind.sql`: `teams.kind` ('club'|'national', default club), `short_name`, `cover_image_url`;
     `island` becomes nullable, with a CHECK that a club still needs one.
@@ -107,12 +107,29 @@
 - The hero test is now flag-aware.
 - Verified with flags ON at 1440/390: home + /teams.
 
-## ⛔ Slice 5b — blocked on confirmation: sample-data purge + flag flip (§4.5)
-With flags ON, the teams/events specs fail because they **hardcode the sample seed**: 5 teams,
-3 events, sample slugs (teams-web-001, teams-e2e-003, events-web-001/002/004, events-e2e-003).
-Steps:
-1. Rework those specs to seed + clean up their own fixtures (no dependency on sample rows).
-2. Delete the sample rows: 5 clubs, 17 team_players, 3 sample events, 9 event_teams links.
-   Neutralise the seed inserts in 0013/0014/0017/0019 so a replay can't bring them back.
-3. Set `NEXT_PUBLIC_TEAMS_ENABLED=true` / `NEXT_PUBLIC_EVENTS_ENABLED=true` for the Fly build and
-   redeploy. They're inlined at build time.
+## Slice 5b — test fixtures + sample-data purge ✅
+1. **Spec rework.** `tests/support/sports-fixtures.ts` seeds and cleans up "E2E …" fixtures
+   (`e2e-` slugs). They mirror the retired samples: 5 clubs, 17 players, 3 events, 9 links, and
+   cleanup deletes only `e2e-` slugs. The read-only specs (teams-web-001/002, events-web-001/002/004)
+   seed in beforeAll and scope their assertions to fixture rows. The CRUD specs (teams-e2e-003/004,
+   events-e2e-003) compare teardown against **baseline counts** captured in beforeAll instead of the
+   hardcoded 5/17/3. teams-e2e-004 uses the fixture club `e2e-cruz-bay-waves`.
+2. **Purge (shared DB = prod, 2026-10-21).** Exact-slug delete in one transaction: 5 sample clubs,
+   which cascaded 17 team_players and the event links, and 3 sample events (9 event_teams). None of
+   them referenced Storage objects. A JSON backup of every deleted row was written to the session
+   scratchpad first. The DB now holds **2 national teams, 1 event (Pan Am), 0 players, 0 links**.
+   The seed inserts in 0013/0014/0017/0019 are replaced with a removal note, so a replay can't
+   bring them back.
+- Verified **after** the purge:
+  - Flags ON (teams/events/home): **82 passed, 22 skipped**.
+  - Flags OFF (shell/init-web-009/articles/home/teams/events): **74 passed, 84 skipped**. The skips
+    are the flag gates and desktop-only tests.
+  - Fixtures left nothing behind.
+- ⚠️ Once the flags are live in prod, any e2e run against the shared DB briefly shows the E2E
+  fixtures on the public site. The real fix is still a non-prod Supabase project for e2e.
+
+## Next — step 3 (needs PR #1 merge)
+Set `NEXT_PUBLIC_TEAMS_ENABLED=true` / `NEXT_PUBLIC_EVENTS_ENABLED=true` for the Fly build
+(Dockerfile ARG/ENV or fly.toml `[build.args]`; they're inlined at build time) and deploy via `main`.
+Content still owed: real stats (`/admin/stats`), national-team cover photos, confirmed Pan Am dates,
+and a review of the drafted team/Get Involved copy.

@@ -45,15 +45,6 @@ create policy teams_public_read on public.teams
   for select using (true);
 
 -- Seed a handful of member clubs across the three islands (idempotent on slug).
-insert into public.teams (name, slug, island, division, description, home_venue, founded_year, sort_order) values
-  ('Frenchtown Sluggers',   'frenchtown-sluggers',   'st_thomas', 'Men''s',
-   'A St. Thomas men''s club competing in the territorial fast-pitch league.', 'Lionel Roberts Stadium', 1998, 10),
-  ('Charlotte Amalie Storm','charlotte-amalie-storm','st_thomas', 'Women''s',
-   'St. Thomas women''s softball, three-time territorial finalists.', 'Lionel Roberts Stadium', 2005, 20),
-  ('Cruz Bay Waves',        'cruz-bay-waves',        'st_john',   'Coed',
-   'St. John''s community coed club, playing out of Cruz Bay.', 'Winston Wells Ballfield', 2012, 10),
-  ('Christiansted Crushers','christiansted-crushers','st_croix',  'Men''s',
-   'St. Croix men''s powerhouse on the east end.', 'Canegata Ballpark', 1991, 10),
-  ('Frederiksted Fire',     'frederiksted-fire',     'st_croix',  'Coed',
-   'West-end St. Croix coed club and youth development pipeline.', 'Paul E. Joseph Stadium', 2008, 20)
-on conflict (slug) do nothing;
+-- Sample seed rows REMOVED (home-layout slice 5b, 2026-10-21): the clearly-sample member clubs
+-- were purged from the shared DB, and this insert was dropped so a replay can't restore them.
+-- e2e specs seed their own fixtures (tests/support/sports-fixtures.ts).
