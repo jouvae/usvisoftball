@@ -1,8 +1,8 @@
 # Status: softball/home-layout
 
-**Updated:** 2026-10-21 · **Branch:** `redesign` (uncommitted) · **Spec:** [`design-guide.md`](./design-guide.md)
+**Updated:** 2026-10-21 · **Branch:** `redesign` · **Spec:** [`design-guide.md`](./design-guide.md)
 
-## Slice 1 — tokens, motifs, chrome ✅ (uncommitted)
+## Slice 1 — tokens, motifs, chrome ✅ (`4ed49dd`)
 - `globals.css`: gold `#F7CF4F` replaces lime; new `navy` family. Royal `#2A51C6` is now interactive-only.
   Every public heading/title that used `text-brand` was moved to `text-navy`; links stayed royal.
 - New components: `components/ui/motifs/` (AccentRule, CornerSlash, StripeEdge, FooterSwoosh,
@@ -28,5 +28,23 @@
 - The sample events (2099) and the sample clubs are still in the DB. `events-web-002/004` depend on
   them, so they get purged with fixture rework in slice 5 (§4.5 gate).
 
+## Slice 2 — hero, Get Involved, /get-involved ✅
+- `components/ui/home-hero.tsx`: no-photo hero (navy, faint island outlines, corner slash) with the
+  two-tone H1, whose accessible name is "U.S. Virgin Islands Softball Federation". The tagline and blurb
+  follow. There are two CTAs: Teams/Events when their flags are on, otherwise **News + Get involved**,
+  so the hero never links to a 404. Support is not in the hero.
+- Crest overhang: `components/client/sticky-header.tsx` sets `data-hero` (home + scroll-top). The
+  crest grows to 80px and overhangs the hero by about 32px on lg+, then shrinks on scroll. It respects
+  reduced motion. The crest now uses `crest.png` (sharp at 2x).
+- `components/ui/get-involved.tsx`: the `INVOLVEMENT` data (shared by home and page) and the home section.
+  Three whole-card-link audience cards; Support → PayPal with "(opens PayPal)".
+- `app/(public)/get-involved/page.tsx`: three anchored sections (#athletes, #volunteers, #support)
+  with mailto enquiries (subject prefilled, email from `contact_info`) and Support → PayPal.
+  **Draft copy, to be reviewed by the Federation.**
+- Tests: new `tests/e2e/home/home-hero-involved.spec.ts`; `home-highlights` h1 regex updated. Ran
+  against a prod build: home-hero-involved + shell-mvp + init-web-009 = 48 passed / 6 skipped;
+  home-highlights anon + carousel tests pass (the editor round-trip test wasn't run because it writes to the DB).
+- Verified visually at 1440/820/390.
+
 ## Next
-Slice 2: hero + Get Involved section + `/get-involved` page.
+Slice 3: curated 3-up news grid (`listHomeNews`), retire the carousel, SectionHeader on news.

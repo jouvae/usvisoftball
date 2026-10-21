@@ -24,7 +24,7 @@ const buttonVariants = cva(
         "outline-dark":
           "border-white/40 font-display font-semibold tracking-wide text-navy-foreground hover:bg-white/10 focus-visible:border-accent focus-visible:ring-accent/50",
         "outline-light":
-          "border-navy/25 bg-white font-display font-semibold tracking-wide text-navy hover:bg-surface",
+          "border-navy/40 bg-white font-display font-semibold tracking-wide text-navy hover:bg-surface",
       },
       size: {
         default:

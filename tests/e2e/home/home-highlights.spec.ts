@@ -106,7 +106,7 @@ test.describe("home-highlights — editor-curated home carousel + toggle round-t
 
     // THEN: the hero h1 renders (the page's sole <h1>).
     await expect(
-      page.getByRole("heading", { level: 1, name: /USVI Softball Federation/i }),
+      page.getByRole("heading", { level: 1, name: /Virgin Islands Softball Federation/i }),
     ).toBeVisible();
 
     // The "view all articles" link ALWAYS shows and routes to /articles.

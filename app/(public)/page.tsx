@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { listHighlightedArticles } from "@/lib/articles";
+import { GetInvolvedSection } from "@/components/ui/get-involved";
+import { HomeHero } from "@/components/ui/home-hero";
 import { ArticleCard } from "@/components/ui/article-card";
 import { HighlightsCarousel } from "@/components/client/highlights-carousel";
 
@@ -8,44 +10,15 @@ import { HighlightsCarousel } from "@/components/client/highlights-carousel";
 // the moment an editor toggles a highlight (the setHighlight action revalidates "/").
 export const dynamic = "force-dynamic";
 
-// Server Component. Home = branded hero + editor-curated highlights carousel. The board
-// roster now lives on /about (redesign IA); the home stays a lean landing.
+// Server Component. Home layout (docs/features/softball/home-layout/design-guide.md), built
+// in slices: hero → [stats, teams, event — later slices] → highlights (becomes the curated
+// news grid in slice 3) → Get Involved. The board roster lives on /about.
 export default async function Home() {
   const highlights = await listHighlightedArticles();
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Hero — full-bleed brand-blue band; the frosty nav sits above it. */}
-      <section className="bg-navy text-navy-foreground">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-20 sm:py-28">
-          <p className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-            U.S. Virgin Islands
-          </p>
-          <h1 className="max-w-3xl font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight sm:text-6xl">
-            USVI Softball Federation
-          </h1>
-          <p className="max-w-2xl text-lg text-white/85">
-            The official home of softball in the U.S. Virgin Islands. We govern,
-            grow, and celebrate the game across St. Thomas, St. John, and St. Croix
-            — from youth leagues to territory champions.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-3">
-            <Link
-              href="/articles"
-              data-testid="hero-articles-cta"
-              className="rounded-full bg-accent px-5 py-2.5 font-display font-semibold uppercase tracking-wide text-accent-foreground outline-focus hover:bg-accent-hover focus:outline-2"
-            >
-              Read the latest
-            </Link>
-            <Link
-              href="/about"
-              className="rounded-full border border-white/40 px-5 py-2.5 font-display font-semibold uppercase tracking-wide text-white outline-focus hover:bg-white/10 focus:outline-2"
-            >
-              About the Federation
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomeHero />
 
       {/* Highlights */}
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-16">
@@ -81,6 +54,8 @@ export default async function Home() {
           </p>
         )}
       </section>
+
+      <GetInvolvedSection />
     </div>
   );
 }
