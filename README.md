@@ -37,6 +37,7 @@ Create `.env.local` (gitignored) with these **names** (never commit values):
 | `SUPABASE_DB_URL` | Direct Postgres connection string — **`psql` only**, never in app code (migrations) |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | Seeded editor operator |
 | `SEED_CONTRIBUTOR_EMAIL` / `SEED_CONTRIBUTOR_PASSWORD` | Seeded contributor operator |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID. **Build-time only**: set in `fly.toml` `[build.args]` for prod; leave unset locally so dev/e2e send no page views. |
 | `NEXT_PUBLIC_AI_DRAFT_ENABLED` | `true` enables the AI draft panel (dev/test). **Unset/`false` in production** until the Federation supplies the owned/licensed source list and a real model is wired. |
 
 > The `SUPABASE_KEY` secret bypasses RLS — read it only in Server Components / Server Actions /

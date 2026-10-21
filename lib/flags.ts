@@ -32,3 +32,8 @@ export const SHOP_ENABLED =
 // env-free Fly build, like next.config's Storage host. TODO: swap PAYPAL_DONATE_URL for
 // the Federation's real PayPal donate link (paypal.me handle or hosted Donate button URL).
 export const PAYPAL_DONATE_URL = "https://www.paypal.com/donate";
+
+// Google Analytics 4 measurement ID. Build-time inlined like the flags above; set ONLY by
+// the production Fly build (fly.toml [build.args]), so dev, local prod builds, and the
+// Playwright runs never send page views. Empty = no analytics tag is rendered.
+export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "";

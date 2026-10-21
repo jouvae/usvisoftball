@@ -8,9 +8,12 @@
 > 15 researched news articles are **live in the shared Supabase DB (= prod)** and render on both `main`
 > (prod, old design) and `redesign`. The Federation board demo was 2026-10-21 (evening).
 >
-> **NEXT:** (1) fix the spelling `Ryann Giddens` → **`Ryann Giddins`** in the published articles (see
-> §Content fixes); (2) decide/merge PR #1 (merging auto-deploys `main` to Fly); (3) start the **home page
-> layout update** from the two sample designs in the repo root (§Next feature).
+> **UPDATE (2026-10-21, later):** all three items below are done. The Giddins spelling is fixed in prod.
+> PR #1 was merged at 00:38 UTC. The home layout update is on PR #2 (branch `home-layout`).
+> **Current handoff: `docs/features/softball/home-layout/status.md`.**
+>
+> ~~NEXT: (1) fix the spelling `Ryann Giddens` → `Ryann Giddins`; (2) decide/merge PR #1; (3) start
+> the home page layout update.~~
 
 ## Done
 
@@ -47,7 +50,8 @@ e2e passes (desktop; the describe is desktop-only so mobile skips). **Not tested
 ## What's left
 
 ### Content fixes (before anyone else reads the articles)
-- **`Ryann Giddens` → `Ryann Giddins`.** The Federation's own U18 travel schedule (`softball-schedule.jpeg`)
+- ✅ **`Ryann Giddens` → `Ryann Giddins` — FIXED 2026-10-21** in all three article bodies (the only
+  occurrences; verified on the live site). The Federation's own U18 travel schedule (`softball-schedule.jpeg`)
   spells it *Giddins*. Appears in: `usvi-18u-wins-nike-rbi-softball-world-series`,
   `usvi-18u-two-year-climb-semifinalists-to-champions`, `meet-the-2026-usvi-18u-roster`. The same sheet
   **confirms** the spellings already used: Isabella Viruet, Inocencia Bermudez, Richard Clendinen, Keira

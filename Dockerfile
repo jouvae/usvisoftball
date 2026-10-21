@@ -16,6 +16,8 @@
 # Feature flags that MUST be set at BUILD time (inlined by `next build`, so a runtime
 # secret has no effect): NEXT_PUBLIC_TEAMS_ENABLED / NEXT_PUBLIC_EVENTS_ENABLED. They are
 # build ARGs below, defaulting to off; fly.toml [build.args] turns them on for prod.
+# NEXT_PUBLIC_GA_MEASUREMENT_ID is the same kind of build arg: empty by default (no Google
+# Analytics), set in fly.toml so only the production image reports page views.
 # (SUPABASE_DB_URL is `psql`-only for out-of-band migrations — NOT an app runtime secret.)
 # The NEXT_PUBLIC_* values are build-time inlined; supply them as build args if the
 # public client must be wired at build. They are NOT secrets, but keep real values
@@ -36,8 +38,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Build-time feature flags (lib/flags.ts: enabled only when exactly "true").
 ARG NEXT_PUBLIC_TEAMS_ENABLED=false
 ARG NEXT_PUBLIC_EVENTS_ENABLED=false
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID=
 ENV NEXT_PUBLIC_TEAMS_ENABLED=$NEXT_PUBLIC_TEAMS_ENABLED \
-    NEXT_PUBLIC_EVENTS_ENABLED=$NEXT_PUBLIC_EVENTS_ENABLED
+    NEXT_PUBLIC_EVENTS_ENABLED=$NEXT_PUBLIC_EVENTS_ENABLED \
+    NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 RUN npm run build
 
 # ---- runner --------------------------------------------------------------------
