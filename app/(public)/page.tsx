@@ -1,23 +1,27 @@
 import { listHomeNews } from "@/lib/articles";
+import { listPublishedStats } from "@/lib/stats";
 import { ArticleCard } from "@/components/ui/article-card";
 import { GetInvolvedSection } from "@/components/ui/get-involved";
 import { HomeHero } from "@/components/ui/home-hero";
 import { SectionHeader } from "@/components/ui/section-header";
+import { StatsStrip } from "@/components/ui/stats-strip";
 
-// The home page reads the curated news grid from the DB via supabase-js (NOT `fetch`), so
-// force per-request rendering — the grid must reflect the live set the moment an editor
-// toggles a highlight (the setHighlight action revalidates "/").
+// The home page reads the curated news grid and the published stats from the DB via
+// supabase-js (NOT `fetch`), so force per-request rendering — both must reflect an editor's
+// change immediately (the highlight and stat actions revalidate "/").
 export const dynamic = "force-dynamic";
 
 // Server Component. Home layout (docs/features/softball/home-layout/design-guide.md), built
-// in slices: hero → [stats, teams, event — slices 4–5] → Latest News → Get Involved. The
-// board roster lives on /about.
+// in slices: hero → stats → [teams, event — slice 5] → Latest News → Get Involved. The
+// board roster lives on /about. Every section's data loads in one Promise.all (no waterfall).
 export default async function Home() {
-  const news = await listHomeNews(3);
+  const [news, stats] = await Promise.all([listHomeNews(3), listPublishedStats(3)]);
 
   return (
     <div className="flex flex-1 flex-col">
       <HomeHero />
+
+      {stats.length > 0 ? <StatsStrip stats={stats} /> : null}
 
       {/* Latest News — editor highlights first, filled with the newest articles (§2.5). */}
       <section

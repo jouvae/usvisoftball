@@ -46,7 +46,7 @@
   home-highlights anon + carousel tests pass (the editor round-trip test wasn't run because it writes to the DB).
 - Verified visually at 1440/820/390.
 
-## Slice 3 — curated news grid ✅
+## Slice 3 — curated news grid ✅ (`6c06d88`)
 - `lib/articles.ts`: `listHomeNews(limit = 3)` is one query (`is_highlight desc, published_at desc`,
   limit). It returns items with `isHighlight` and replaces `listHighlightedArticles`, which had no
   other caller.
@@ -66,5 +66,27 @@
 - Visual check at 1440/820/390. On 820 the spanning third card crops the top of its typographic
   cover; acceptable, and real photos will crop more gracefully.
 
+## Slice 4 — editor-managed stats strip ✅
+- **`0023_home_stats.sql`, applied to the shared DB (= prod) on 2026-10-21, with 0 rows.** Every stat has the same
+  shape, enforced by CHECKs: label ≤40, value ≤12, detail ≤60, an icon enum, a required `as_of`, and
+  `source_url` https-only. `is_published` defaults to false. RLS: anon sees published rows only;
+  editors read everything and write. **No seed rows.**
+- `lib/stats-view.ts` (client-safe types, icons, `formatAsOf`, `safeSourceHref`) and `lib/stats.ts`
+  (server-only `listPublishedStats`, `listAllStats`, create/update/delete; https check on write).
+- `/admin/stats` (editor-only, linked from the dashboard as `admin-stats-link`): an add form plus a
+  per-stat edit/delete. Each item shows Draft/Published and its as-of date. Actions revalidate "/".
+- `components/ui/stats-strip.tsx`: medallion icon, label, big value, optional detail (links to the
+  source when set), and "as of Mon YYYY"; `<dl>` semantics; gold dividers; faint island outlines. The
+  home page renders it under the hero only when ≥1 stat is published. Data loads in one `Promise.all`
+  with the news grid.
+- Tests: new `tests/e2e/home/home-stats.spec.ts` covers the strip shape, the RLS check (the public API
+  returns no drafts), the editor draft → publish → unpublish → delete round trip on the anon home, and
+  rejection of a non-https source. It cleans up after itself. The home suite + shell-mvp + init-web-009
+  give **60 passed, 16 skipped**, and home-stats alone gives 4/4 on desktop. The table is back to 0 rows.
+- Visual check at 1440/390 using three temporary placeholder rows, deleted straight after.
+- ⏭ **Content:** an editor needs to enter and publish the real, verified figures. The comp's
+  "No. 32 WBSC" and "2026 CAC Silver" are still unverified.
+
 ## Next
-Slice 4: `home_stats` migration + `lib/stats.ts` + admin editor + the stats strip.
+Slice 5: teams `kind`/cover + events cover migrations, `getNextEvent`, the home Teams + Event
+sections, the national-first `/teams`, then the §4.5 purge gate and the flag flip.
