@@ -1,5 +1,8 @@
 # Status: softball/init
 
+> ⏩ **Superseded for current work (2026-10-21):** init shipped long ago. The live handoff is
+> [`docs/features/softball/redesign/status.md`](../redesign/status.md) — start there.
+
 **Active tier:** T3   **Phase:** Actualize (Phase 3) — **MERGED to `main`; pre-deploy pending**   **Updated:** 2026-07-31
 
 > ▶ **SESSION HANDOFF (2026-07-31)** — *this block + the Resume recipe are the single entry point
