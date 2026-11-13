@@ -25,6 +25,8 @@ const SOCIAL_ICONS: Record<BoardSocialPlatform, ComponentType<SVGProps<SVGSVGEle
 // The /about board grid + profile modal. CLIENT island. Layout follows the "Meet our
 // leadership" team section (components/samples/board-member-section.tsx): a centered grid
 // of large round headshots with the name, the office, and the member's social icons below.
+// It is a centered flex-wrap (2-up, 4-up on lg) rather than a CSS grid, so a partial last
+// row (e.g. the 9th member) sits in the middle instead of hanging at the left.
 // The headshot + name + office are one button that opens a native <dialog> profile modal
 // (photo, name, office, bio, social links); the social icons sit OUTSIDE that button
 // because a link can't nest inside a button. The island seat is not shown publicly: the
@@ -53,10 +55,13 @@ export function BoardGrid({ members }: { members: BoardMember[] }) {
       <ul
         role="list"
         data-testid="board-grid"
-        className="mx-auto grid max-w-2xl grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-8 sm:gap-y-14 lg:max-w-none lg:grid-cols-4"
+        className="mx-auto flex max-w-2xl flex-wrap justify-center gap-x-4 gap-y-10 sm:gap-x-8 sm:gap-y-14 lg:max-w-none"
       >
         {members.map((m) => (
-          <li key={m.id} className="flex flex-col items-center text-center">
+          <li
+            key={m.id}
+            className="flex w-[calc((100%-1rem)/2)] flex-col items-center text-center sm:w-[calc((100%-2rem)/2)] lg:w-[calc((100%-6rem)/4)]"
+          >
             <button
               type="button"
               data-testid="board-grid-card"
