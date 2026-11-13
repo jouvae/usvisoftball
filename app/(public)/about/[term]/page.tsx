@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { listBoardForTerm } from "@/lib/board";
+import { BOARD_HIDDEN } from "@/lib/flags";
 import { BoardRoster } from "@/components/ui/board-roster";
 
 // Per-request render: this reads Supabase (RLS publishable client) for a term's roster.
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function AboutTermPage({
   params,
 }: PageProps<"/about/[term]">) {
+  if (BOARD_HIDDEN) notFound();
   const { term } = await params;
 
   const found = await listBoardForTerm(term);

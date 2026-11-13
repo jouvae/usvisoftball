@@ -33,6 +33,13 @@ export const SHOP_ENABLED =
 // the Federation's real PayPal donate link (paypal.me handle or hosted Donate button URL).
 export const PAYPAL_DONATE_URL = "https://www.paypal.com/donate";
 
+// Hides the board of directors on the public site (the /about board section, the Past
+// Boards list, and /about/[term]) while its details are being corrected. Inverted on
+// purpose: unset = shown, so dev and e2e keep rendering the board; prod sets it to "true"
+// in fly.toml [build.args]. Editors still manage the board in /admin/board. Build-time
+// inlined, so showing it again means setting "false" and redeploying.
+export const BOARD_HIDDEN = process.env.NEXT_PUBLIC_BOARD_HIDDEN === "true";
+
 // Google Analytics 4 measurement ID. Build-time inlined like the flags above; set ONLY by
 // the production Fly build (fly.toml [build.args]), so dev, local prod builds, and the
 // Playwright runs never send page views. Empty = no analytics tag is rendered.

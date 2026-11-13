@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getMission, listCurrentBoard, listArchivedTerms } from "@/lib/board";
+import { BOARD_HIDDEN } from "@/lib/flags";
 import { getContactInfo } from "@/lib/contact";
 import { listCommittees } from "@/lib/committees";
 import { listPublishedArticles } from "@/lib/articles";
@@ -36,8 +37,10 @@ export default async function AboutPage() {
   const [mission, currentBoard, archivedTerms, contact, committees, articles] =
     await Promise.all([
       getMission(),
-      listCurrentBoard(),
-      listArchivedTerms(),
+      // BOARD_HIDDEN (prod, while the roster is corrected) skips both board reads, so
+      // neither the current board nor the Past Boards list renders.
+      BOARD_HIDDEN ? null : listCurrentBoard(),
+      BOARD_HIDDEN ? [] : listArchivedTerms(),
       getContactInfo(),
       listCommittees(),
       listPublishedArticles(),
