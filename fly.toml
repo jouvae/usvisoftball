@@ -16,6 +16,9 @@ primary_region = 'ewr'
   NEXT_PUBLIC_EVENTS_ENABLED = "true"
   # Google Analytics 4 (public site only; see lib/flags.ts GA_MEASUREMENT_ID).
   NEXT_PUBLIC_GA_MEASUREMENT_ID = "G-DS4Z8KKPNX"
+  # Board of directors hidden on the public site while its details are corrected in
+  # /admin/board. Set to "false" and redeploy to show it again.
+  NEXT_PUBLIC_BOARD_HIDDEN = "true"
 
 [http_service]
   internal_port = 8080
