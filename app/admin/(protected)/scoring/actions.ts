@@ -54,7 +54,9 @@ const MAX_LINEUP = 60;
 const SIGNED_OUT = "You're signed out or not allowed to keep score. Please sign in again.";
 const NO_GAME = "We couldn't find that game. Go back to the games list and open it again.";
 const NOT_SAVED = "That change didn't save. Please try again.";
-const LINEUP_REMOVAL = "Only an editor can take a player off the lineup once it's saved.";
+// Shown when RLS removed fewer lines than asked (0028: a scorekeeper may only delete an
+// all-zero line — a stat was added meanwhile, e.g. from another phone).
+const LINEUP_REMOVAL = "That player now has stats, so they can't be taken off. Clear their stats first.";
 const FINAL_LOCKED = "This game is over. Ask an editor to reopen it to change the score.";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -254,11 +256,10 @@ export async function setLineup(
   }
   const keep = new Set(playerIds);
   for (const [id, existing] of game.statLines) {
+    // A zero line may be removed by a scorekeeper too (0028 RLS); one with stats never is.
     if (!keep.has(id) && !isZeroLine(existing)) {
       return fail("A player who already has stats can't be taken off. Clear their stats first.");
     }
-    // game_player_stats DELETE is editor-only (0026 RLS): refuse up front rather than half-write.
-    if (!keep.has(id) && !caller.isEditor) return fail(LINEUP_REMOVAL);
   }
   return write(() => saveLineup({ kind: "setLineup", gameId: game.id, playerIds }));
 }

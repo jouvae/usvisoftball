@@ -14,19 +14,7 @@ import {
   type PlayerStatLineWithPlayer,
   type StatLineInput,
 } from "@/lib/schedule-view";
-
-const BATTING: { key: keyof BattingLine; label: string }[] = [
-  { key: "ab", label: "At bats" },
-  { key: "r", label: "Runs" },
-  { key: "h", label: "Hits" },
-  { key: "doubles", label: "Doubles" },
-  { key: "triples", label: "Triples" },
-  { key: "hr", label: "Home runs" },
-  { key: "rbi", label: "Runs batted in" },
-  { key: "bb", label: "Walks" },
-  { key: "so", label: "Strikeouts" },
-  { key: "sb", label: "Stolen bases" },
-];
+import { BATTING_FIELDS } from "@/lib/scoring-view";
 
 // Pitching steppers; `id` is the testid stem from the §6.1 contract.
 const PITCHING: { key: keyof PitchingLine; id: string; label: string }[] = [
@@ -183,7 +171,7 @@ function StatSheet({
               {error}
             </p>
           ) : null}
-          {BATTING.map((f) => (
+          {BATTING_FIELDS.map((f) => (
             <Stepper
               key={f.key}
               id={f.key}

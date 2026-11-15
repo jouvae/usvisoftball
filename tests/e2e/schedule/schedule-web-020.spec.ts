@@ -86,6 +86,9 @@ test.describe("schedule-web-020 — Spanish event page", () => {
     await expect(detail.getByTestId("event-time-local")).toContainText(
       formatEventTime(EV.startsAt, SFX_TZ, "es"),
     );
+    // Polish: localized "local" caption with the venue country; Atlantic keeps AST.
+    await expect(detail.getByTestId("event-time-local")).toContainText("Hora local · El Salvador");
+    await expect(detail.getByTestId("event-time-atlantic")).toContainText("AST · hora de USVI");
   });
 
   test("/es/events rows link to /es/events/[slug] with Spanish names", async ({ page }) => {
@@ -94,5 +97,7 @@ test.describe("schedule-web-020 — Spanish event page", () => {
     const row = page.locator(`[data-testid="event-row"][data-slug="${EV.slug}"]`);
     await expect(row).toHaveAttribute("href", `/es/events/${EV.slug}`);
     await expect(row.getByTestId("event-row-home")).toContainText("Islas Vírgenes de EE. UU.");
+    await expect(row.getByTestId("event-row-time")).toContainText("local");
+    await expect(row.getByTestId("event-row-status")).toHaveText("Próximo"); // sr-only, still localized
   });
 });

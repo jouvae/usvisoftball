@@ -118,8 +118,9 @@ export async function saveStatLine(op: Omit<SetStatLineOp, "seq">): Promise<void
   if (error) throw error;
 }
 
-// Thrown by saveLineup when RLS refused to remove a line (game_player_stats DELETE is
-// editor-only in 0026), so the action can explain it instead of reporting success.
+// Thrown by saveLineup when RLS removed fewer lines than asked (0028: a scorekeeper may delete
+// only an all-zero line; a stat added concurrently hides the row from that policy), so the
+// action can explain it instead of reporting success.
 export class LineupRemovalRefused extends Error {}
 
 // Insert zero lines for op.playerIds lacking one; delete lines of absent players only when

@@ -82,6 +82,13 @@ test.describe("schedule-web-015 — event page sections", () => {
     await expect(detail.getByTestId("event-time-atlantic")).toContainText(
       formatEventTime(ev.startsAt, ATLANTIC_TZ, "en"), // 11:00 AM
     );
+    // Polish: the venue-local caption names the country, not a bare "CST" (US Central?).
+    await expect(detail.getByTestId("event-time-local")).toContainText("Local time · El Salvador");
+    await expect(detail.getByTestId("event-time-local")).not.toContainText("CST");
+    await expect(detail.getByTestId("event-time-atlantic")).toContainText("AST · USVI time");
+    // Polish: a pregame header shows no visible chip (status kept visually hidden).
+    await expect(detail.getByTestId("event-state")).toHaveText("Upcoming");
+    await expect(detail.getByTestId("event-state")).toHaveClass(/\bsr-only\b/);
     await expect(detail.getByTestId("event-detail-venue")).toContainText(ev.venue);
 
     const map = detail.getByTestId("event-detail-map");
@@ -149,6 +156,7 @@ test.describe("schedule-web-015 — event page sections", () => {
     const ev = SFX_EVENTS.finalCoMx;
     const detail = await open(page, ev.slug);
     await expect(detail.getByTestId("event-state")).toHaveText(/Final/);
+    await expect(detail.getByTestId("event-state")).toHaveText(/Final · 3–1/); // polish: score on chip
     // Atlantic time is present for every game, not only USVI ones.
     await expect(detail.getByTestId("event-time-atlantic")).toContainText(
       formatEventTime(ev.startsAt, ATLANTIC_TZ, "en"),

@@ -97,6 +97,12 @@ test.describe("schedule-web-012 — cards view", () => {
           teamDisplayName(SFX_TEAMS[ev.game.home], "en"),
         );
         await expect(c.getByTestId("event-row-status")).toHaveCount(1);
+        // Polish: pregame cards carry only a visually-hidden status (no visible chip).
+        if (ev.game.state === "pregame") {
+          await expect(c.getByTestId("event-row-status")).toHaveClass(/\bsr-only\b/);
+        } else {
+          await expect(c.getByTestId("event-row-status")).not.toHaveClass(/\bsr-only\b/);
+        }
       } else {
         await expect(c.getByTestId("event-row-title")).toContainText(ev.title);
         await expect(c.getByTestId("event-row-away")).toHaveCount(0);

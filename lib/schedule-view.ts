@@ -9,6 +9,7 @@
 // helper is pure and timezone-explicit so server and client render identically (Vitest:
 // tests/unit, scenarios schedule-unit-001..009).
 
+import { getDictionary } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locale";
 import type { TeamKind, TeamPlayer } from "@/lib/teams-view";
 
@@ -18,6 +19,10 @@ export type { Locale };
 
 // The USVI's IANA zone (Atlantic Standard Time, UTC−4, no DST). USVI fans read times here.
 export const ATLANTIC_TZ = "America/St_Thomas";
+
+// Its label in every locale. The USVI never observes DST, so it is always "AST" (Intl 'es' would
+// print "GMT-4", which fans don't read as USVI time).
+export const ATLANTIC_LABEL = "AST";
 
 // ISO 3166-1 alpha-2 code for the U.S. Virgin Islands — marks "our" teams and games.
 export const USVI_COUNTRY = "VI";
@@ -307,6 +312,36 @@ export function timeZoneLabel(iso: string, timeZone: string, locale: Locale): st
     .formatToParts(new Date(iso))
     .find((p) => p.type === "timeZoneName");
   return part?.value ?? timeZone;
+}
+
+// The zone word printed after a venue-local time. A bare abbreviation like "CST" reads as US
+// Central to most fans, so any venue outside the USVI says "local" (en/es); a USVI (Atlantic)
+// venue keeps "AST", which USVI fans know. Pass ATLANTIC_TZ for the USVI-time line.
+export function venueZoneLabel(timeZone: string, locale: Locale): string {
+  if (timeZone === ATLANTIC_TZ) return ATLANTIC_LABEL;
+  return getDictionary(locale).schedule.localShort;
+}
+
+// The caption under the venue-local time in the event detail: "Local time · El Salvador" /
+// "Hora local · El Salvador" (just "Local time" without a country); an Atlantic venue says
+// "AST · USVI time" / "AST · hora de USVI".
+export function localTimeCaption(
+  timeZone: string,
+  countryCode: string | null | undefined,
+  locale: Locale,
+): string {
+  const t = getDictionary(locale).schedule;
+  if (timeZone === ATLANTIC_TZ) return `${ATLANTIC_LABEL} · ${t.atlanticTime}`;
+  return countryCode ? `${t.localTime} · ${countryName(countryCode, locale)}` : t.localTime;
+}
+
+// The OG share image's time line (English): "Saturday, November 21 · 3:00 PM local · 5:00 PM AST";
+// an Atlantic venue shows its time once ("· 5:00 PM AST").
+export function ogWhenLine(iso: string, timeZone: string): string {
+  const date = formatEventDate(iso, timeZone, "en");
+  const atlantic = `${formatEventTime(iso, ATLANTIC_TZ, "en")} ${ATLANTIC_LABEL}`;
+  if (timeZone === ATLANTIC_TZ) return `${date} · ${atlantic}`;
+  return `${date} · ${formatEventTime(iso, timeZone, "en")} ${venueZoneLabel(timeZone, "en")} · ${atlantic}`;
 }
 
 // Long date label of an instant in a zone (en "Saturday, November 21", es "sábado, 21 de noviembre").

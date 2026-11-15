@@ -53,7 +53,7 @@ export default async function EventPage({ params }: PageProps<"/events/[slug]">)
   const jsonLd = eventJsonLd(event, { locale, url: `${SITE_URL}${path}`, siteUrl: SITE_URL });
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6 sm:py-12">
+    <section className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6 sm:py-12">
       <script
         type="application/ld+json"
         // Safe: serializeJsonLd escapes `<`, so no value can close the script element.

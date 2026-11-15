@@ -3,7 +3,7 @@ import Link from "next/link";
 import { EventStateChip } from "@/components/ui/event-state-chip";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { requireAnyRole } from "@/lib/roles";
-import { formatEventTime, formatShortDate, isUsviGame, timeZoneLabel } from "@/lib/schedule-view";
+import { formatEventTime, formatShortDate, isUsviGame, venueZoneLabel } from "@/lib/schedule-view";
 import { listScoringGames, scoringDayGroup } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Scoring" };
@@ -43,7 +43,7 @@ export default async function ScoringGamesPage() {
                 <span className="flex items-center justify-between gap-3 text-sm text-muted">
                   <span>
                     <span className="font-semibold text-navy">{GROUP_LABEL[group]}</span> · {when}{" "}
-                    {timeZoneLabel(row.startsAt, row.timezone, "en")}
+                    {venueZoneLabel(row.timezone, "en")}
                   </span>
                   <EventStateChip event={row} locale="en" />
                 </span>

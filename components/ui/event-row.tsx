@@ -9,7 +9,7 @@ import {
   gameWinner,
   isUsviGame,
   runTotals,
-  timeZoneLabel,
+  venueZoneLabel,
   type EventWithGame,
   type Locale,
   type Side,
@@ -56,14 +56,11 @@ export function EventRow({
       ) : null}
       <span className="font-display text-lg font-semibold text-navy tabular-nums">
         <time dateTime={event.startsAt}>{formatEventTime(event.startsAt, tz, locale)}</time>{" "}
-        <span className="text-xs font-medium text-muted">
-          {timeZoneLabel(event.startsAt, tz, locale)}
-        </span>
+        <span className="text-xs font-medium text-muted">{venueZoneLabel(tz, locale)}</span>
       </span>
       {atlantic ? (
         <span data-testid="event-row-time-atlantic" className="text-xs text-muted tabular-nums">
-          {formatEventTime(event.startsAt, ATLANTIC_TZ, locale)}{" "}
-          {timeZoneLabel(event.startsAt, ATLANTIC_TZ, locale)}
+          {formatEventTime(event.startsAt, ATLANTIC_TZ, locale)} {venueZoneLabel(ATLANTIC_TZ, locale)}
         </span>
       ) : null}
     </div>

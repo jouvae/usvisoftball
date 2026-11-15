@@ -14,7 +14,7 @@ import {
   isoWithOffset,
   runTotals,
   teamDisplayName,
-  timeZoneLabel,
+  venueZoneLabel,
   type EventStatus,
   type EventWithGame,
   type Locale,
@@ -60,7 +60,7 @@ export function eventMetaDescription(event: SeoEvent, locale: Locale): string {
     event.startsAt,
     event.timezone,
     locale,
-  )} ${timeZoneLabel(event.startsAt, event.timezone, locale)}`;
+  )} ${venueZoneLabel(event.timezone, locale)}`;
   const parts = [`${eventDisplayTitle(event, locale)}. ${when} · ${event.venue}.`];
   const t = tournamentName(event, locale);
   if (t) parts.push(`${t}.`);

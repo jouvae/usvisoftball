@@ -86,3 +86,36 @@ online they sync in order and reload shows the right totals.
 checked players; entering AB 3, H 1, RBI 1 for a player shows on the public box score; H > AB is
 blocked with a hint.
 **schedule-e2e-006 Final.** Final (confirmed) sets state final; the public page shows "Final".
+
+## S5 — Timeline, calendar, sitemap
+
+**schedule-web-021 Timeline view.** `?view=timeline` (switcher `events-view-timeline`) renders
+`events-timeline` for one venue-local day: day selector `timeline-day[data-date]` (selected is
+aria-current; no `date` → the first upcoming day with events; picking sets `date=YYYY-MM-DD`), one
+`timeline-lane[data-venue]` per venue (labelled), an hour axis `timeline-axis`, and items
+`timeline-item[data-slug][data-usvi]` linking to `/events/{slug}`, placed left→right by venue-local
+start (12:00 left of 15:00 in E2E Field Bravo). Clicking an item opens the modal/drawer. On mobile the
+timeline scrolls horizontally inside its container; the page never overflows horizontally.
+**schedule-web-022 Calendar view + list date filter.** `?view=calendar` (switcher
+`events-view-calendar`) renders `events-calendar` with `calendar-month-heading` (localized month +
+year), `calendar-prev`/`calendar-next` changing `month=YYYY-MM`, default month = month of the first
+upcoming event, and `calendar-day[data-date]` cells for whole weeks (Sunday-first en, Monday-first
+es). Event days show `calendar-day-count`, link to `?view=list&date=YYYY-MM-DD`, and are
+`data-usvi="true"` when they have a USVI game. `/events?view=list&date=YYYY-MM-DD` shows only that
+venue-local day (one `events-day`) plus `events-date-clear` back to the full list. `/es/…` names the
+month in Spanish ("marzo de 2099").
+**schedule-web-023 Sitemap + robots.** `GET /sitemap.xml` → 200 XML with absolute
+`https://usvisoftball.org` URLs for `/`, `/events`, `/es/events`, each event `/events/{slug}` +
+`/es/events/{slug}` (with `xhtml:link rel="alternate" hreflang="en|es"` pairs), `/tournaments/{slug}`
+and guest `/teams/{slug}`. `GET /robots.txt` allows `/`, disallows `/admin`, lists the sitemap URL.
+**schedule-unit-011 Month grid.** `calendarMonthGrid(year, month, weekStartsOn)` → weeks of 7 ISO
+dates incl. leading/trailing days: 2099-03 Sun-start Mar 1 … Apr 4 (5 weeks); Mon-start Feb 23 …
+Apr 5 (6 weeks); exact-fit months have no padding; leap years and year rollover handled.
+**schedule-unit-012 Timeline range.** `timelineRange(events, tz)` → `{startHour, endHour}`: floor of
+the earliest venue-local start, ceil of the latest `endsAt ?? startsAt + 2h`, capped at 24 (09/12/15
+→ 9–17; 18:30/19:00 → 18–21; 21:00/23:00 → 21–24).
+**schedule-unit-013 Timeline position.** `timelinePosition(iso, range, tz)` → linear 0..1 within the
+range in venue-local time, clamped (range 9–17: 09:00 → 0, 13:00 → 0.5, 17:00 → 1, 08:00 → 0).
+**schedule-unit-014 Default calendar month.** `defaultCalendarMonth(events, nowIso, tz)` →
+`"YYYY-MM"` of the first event whose venue-local date is today or later (an event earlier today
+still counts); none upcoming → the latest event's month; no events → the current venue-local month.

@@ -64,7 +64,7 @@ are dropped by a later **contract** migration run only after this branch is depl
 - **`team_players`** — add `active boolean not null default true`.
 - **RLS** — public SELECT on all new tables. `tournaments`/`calendar_events`: editor writes.
   `games`/`game_innings`/`game_player_stats`: editor OR `scorekeeper` writes (no delete on stats except
-  editor). Same `has_role(auth.uid(), …)` pattern as 0018/0023.
+  editor; since 0028 a scorekeeper may delete an all-zero line). Same `has_role(auth.uid(), …)` pattern as 0018/0023.
 - **Deferred to the contract migration (run at deploy):** drop legacy `events`/`event_teams`; drop
   editor DELETE on `team_players`; `team_players.team_id` FK → restrict.
 

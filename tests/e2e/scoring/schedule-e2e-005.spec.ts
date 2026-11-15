@@ -21,15 +21,18 @@ A signed-in `scorekeeper` on the PREGAME fixture USVI game (Colombia @ E2E Scori
 
 ## When
 They open `scoring-tab-lineup`: the checklist lists only the active players, all pre-checked
-(no lines yet). They uncheck Player Two and `lineup-save`. On `scoring-tab-boxscore` they open
+(no lines yet). They `lineup-save` (two zero lines), then uncheck Player Two (a zero line — a
+scorekeeper may remove it since 0028, no `lineup-error`) and `lineup-save` again. On `scoring-tab-boxscore` they open
 Player One (`boxscore-edit-player` → `stat-sheet`), first try `stat-h-plus` at AB 0, then tap
 AB +3, H +1, RBI +1.
 
 ## Then
-Only Player One has a box-score row. The H tap at AB 0 is refused: `stat-h-value` stays 0 and
+Only Player One has a box-score row (after a reload). The stat sheet lists batting steppers
+AB, H, R, RBI, BB, SO, 2B, 3B, HR, SB in that order. The H tap at AB 0 is refused: `stat-h-value` stays 0 and
 `stat-error` says "Hits can't be more than at-bats." Afterwards AB 3 / H 1 / RBI 1 are shown,
 saved, and survive a reload. With the USVI scoreboard at 0 hits, `scoring-hits-mismatch` is
-shown; one `scoring-hits-plus-home` tap clears it. The public event page's `boxscore` lists
+shown; one `scoring-hits-plus-home` tap clears it. Unchecking Player One (who has stats) is
+refused with `lineup-error`. The public event page's `boxscore` lists
 Player One and not Player Two.
 */
 
@@ -93,17 +96,40 @@ test.describe("schedule-e2e-005 — lineup + box score", () => {
     await expect(byPlayer(page, "lineup-player", fx.playerIds.two)).toBeChecked();
     await expect(byPlayer(page, "lineup-player", fx.playerIds.benched)).toHaveCount(0);
 
+    // Save both (two zero lines), then take Player Two off again. Polish (0028): a
+    // SCOREKEEPER may now remove a saved all-zero line (was editor-only, refused with
+    // lineup-error); a line with stats is still refused (asserted further down).
+    await page.getByTestId("lineup-save").click();
+    await expectSaved(page);
+    await page.getByTestId("scoring-tab-boxscore").click();
+    await expect(page.getByTestId("boxscore-edit-player")).toHaveCount(2);
+
+    await page.getByTestId("scoring-tab-lineup").click();
+    await expect(byPlayer(page, "lineup-player", fx.playerIds.two)).toBeChecked();
     await byPlayer(page, "lineup-player", fx.playerIds.two).uncheck();
+    await expect(page.getByTestId("lineup-error")).toHaveCount(0);
+    await expect(byPlayer(page, "lineup-player", fx.playerIds.two)).not.toBeChecked();
     await page.getByTestId("lineup-save").click();
     await expectSaved(page);
 
-    // ── Box score: only the checked player has a line ─────────────────────────
+    // ── Box score: only the checked player has a line (persisted server-side) ──
+    await page.reload();
+    await expectSaved(page);
     await page.getByTestId("scoring-tab-boxscore").click();
     await expect(page.getByTestId("boxscore-edit-player")).toHaveCount(1);
     await expect(byPlayer(page, "boxscore-edit-player", fx.playerIds.one)).toBeVisible();
 
     const sheet = await openPlayerSheet(page, fx.playerIds.one);
     await expect(sheet.getByTestId("stat-ab-value")).toHaveText("0");
+
+    // Polish: batting steppers in scorebook order — AB H R RBI BB SO, then 2B 3B HR SB.
+    const batting = ["ab", "h", "r", "rbi", "bb", "so", "doubles", "triples", "hr", "sb"];
+    const valueIds = await sheet
+      .locator('[data-testid^="stat-"][data-testid$="-value"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid") ?? ""));
+    expect(valueIds.filter((id) => batting.some((k) => id === `stat-${k}-value`))).toEqual(
+      batting.map((k) => `stat-${k}-value`),
+    );
 
     // H above AB is refused with a plain-language hint.
     await sheet.getByTestId("stat-h-plus").click();

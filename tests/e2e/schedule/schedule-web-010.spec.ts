@@ -162,11 +162,30 @@ test.describe("schedule-web-010 — /events list grouped by day → venue", () =
     await expect(r.getByTestId("event-row-home")).toContainText(
       teamDisplayName(SFX_TEAMS.usvi, "en"),
     );
-    await expect(r.getByTestId("event-row-status")).toHaveCount(1);
+    // Polish (2026-11-15): a pregame row shows NO visible chip — the status testid stays as a
+    // visually-hidden "Upcoming" for screen readers (was a visible "UPCOMING" pill).
+    const status = r.getByTestId("event-row-status");
+    await expect(status).toHaveCount(1);
+    await expect(status).toHaveText("Upcoming");
+    await expect(status).toHaveClass(/\bsr-only\b/);
     await expect(r.getByTestId("event-row-title")).toHaveCount(0);
+    // Venue-local time says "local" (not a bare "CST"); the Atlantic line keeps "AST".
+    await expect(r.getByTestId("event-row-time")).toContainText("local");
+    await expect(r.getByTestId("event-row-time")).not.toContainText("CST");
+    await expect(r.getByTestId("event-row-time-atlantic")).toContainText("AST");
 
     const fin = row(page, SFX_EVENTS.finalCoMx.slug);
     await expect(fin.getByTestId("event-row-status")).toContainText("Final");
+    // Final chips carry the score (away–home).
+    await expect(fin.getByTestId("event-row-status")).toHaveText(/Final · 3–1/);
+    await expect(fin.getByTestId("event-row-status")).not.toHaveClass(/\bsr-only\b/);
+  });
+
+  test("the intro legend explains 'local' and AST (USVI time)", async ({ page }) => {
+    const intro = page.getByTestId("events-intro");
+    await expect(intro).toContainText("local");
+    await expect(intro).toContainText("AST");
+    await expect(intro).toContainText("USVI time");
   });
 
   test("the ceremony row shows its title instead of teams", async ({ page }) => {

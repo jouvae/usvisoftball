@@ -4,17 +4,17 @@ import { ImageResponse } from "next/og";
 import {
   getEventBySlug,
   eventDisplayTitle,
-  formatEventDate,
-  formatEventTime,
+  gameWinner,
+  ogWhenLine,
   runTotals,
   teamDisplayName,
-  timeZoneLabel,
   type GameWithTeams,
 } from "@/lib/schedule";
 
 // The per-event share image (D8): 1200×630 PNG — navy field, gold accents, both teams with
-// their country codes, the venue-local date/time with its zone, the tournament, and the final
-// score once the game is over. Oswald is vendored as static TTF instances (app/fonts; satori
+// their country codes, the date with venue-local time ("local") AND Atlantic time (AST — the
+// USVI audience), the tournament, and — once final — a big gold score per team plus a FINAL
+// banner, with the winner at full strength and the loser dimmed. Oswald is vendored as static TTF instances (app/fonts; satori
 // can't read woff2) and read from disk, so rendering needs no network. Country codes stand in
 // for flag emoji: satori draws emoji only from a CDN-fetched image set.
 // force-dynamic: rendered per request from Supabase — never at the env-free build.
@@ -40,14 +40,16 @@ function TeamLine({
   game,
   side,
   score,
+  dim = false,
 }: {
   game: GameWithTeams;
   side: "away" | "home";
   score: number | null;
+  dim?: boolean;
 }) {
   const team = game[side];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 28, opacity: dim ? 0.6 : 1 }}>
       <div
         style={{
           display: "flex",
@@ -68,7 +70,19 @@ function TeamLine({
         {teamDisplayName(team, "en")}
       </div>
       {score != null ? (
-        <div style={{ display: "flex", fontSize: 92, fontWeight: 700, color: GOLD }}>{score}</div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 120,
+            fontWeight: 700,
+            lineHeight: 1,
+            color: GOLD,
+            minWidth: 110,
+            justifyContent: "flex-end",
+          }}
+        >
+          {score}
+        </div>
       ) : null}
     </div>
   );
@@ -83,9 +97,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const final = game?.state === "final";
   const totals = game ? runTotals(game.innings) : null;
   const tournament = event?.tournamentDetail?.name ?? event?.tournament?.name ?? "";
-  const when = event
-    ? `${formatEventDate(event.startsAt, tz, "en")} · ${formatEventTime(event.startsAt, tz, "en")} ${timeZoneLabel(event.startsAt, tz, "en")}`
-    : "";
+  const when = event ? ogWhenLine(event.startsAt, tz) : "";
+  const winner = game && totals ? gameWinner(game, totals) : null;
 
   return new ImageResponse(
     (
@@ -150,11 +163,38 @@ export default async function Image({ params }: { params: Promise<{ slug: string
 
           {game ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-              <TeamLine game={game} side="away" score={final && totals ? totals.away : null} />
-              <div style={{ display: "flex", fontSize: 30, color: MUTED, paddingLeft: 132 }}>
-                {final ? "FINAL" : "VS"}
-              </div>
-              <TeamLine game={game} side="home" score={final && totals ? totals.home : null} />
+              <TeamLine
+                game={game}
+                side="away"
+                score={final && totals ? totals.away : null}
+                dim={winner === "home"}
+              />
+              {final ? (
+                <div style={{ display: "flex", paddingLeft: 132 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      fontSize: 30,
+                      fontWeight: 700,
+                      letterSpacing: 4,
+                      color: NAVY,
+                      background: GOLD,
+                      borderRadius: 8,
+                      padding: "2px 16px",
+                    }}
+                  >
+                    FINAL
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", fontSize: 30, color: MUTED, paddingLeft: 132 }}>VS</div>
+              )}
+              <TeamLine
+                game={game}
+                side="home"
+                score={final && totals ? totals.home : null}
+                dim={winner === "away"}
+              />
             </div>
           ) : (
             <div style={{ display: "flex", fontSize: 84, fontWeight: 700, lineHeight: 1.05 }}>

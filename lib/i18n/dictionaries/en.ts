@@ -34,7 +34,7 @@ export const en = {
   schedule: {
     eventsTitle: "Events",
     eventsIntro:
-      "Games, ceremonies and results. Times are shown in the venue's local time, with Atlantic time (USVI) alongside.",
+      "Games, ceremonies and results. Times marked “local” are the venue's local time; AST is USVI time.",
     eventsMetaTitle: "Events & schedule — USVI Softball Federation",
     viewLabel: "View",
     viewList: "List",
@@ -52,6 +52,7 @@ export const en = {
     inning: "Inning",
     whenWhere: "When & where",
     localTime: "Local time",
+    localShort: "local",
     atlanticTime: "USVI time",
     venue: "Venue",
     map: "Open in Google Maps",

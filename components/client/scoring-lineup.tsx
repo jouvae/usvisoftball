@@ -8,16 +8,14 @@ import { isZeroLine } from "@/lib/scoring-view";
 
 // Lineup tab (schedule overview §6 item 3): "Who played?" — the USVI side's ACTIVE roster as
 // a checklist, pre-checked when the game has no lines yet. Save sends one setLineup op.
-// Unchecking a player whose line already has stats is refused with a hint (lineup-error);
-// so is removing a saved line for a non-editor (0026: deleting a line is editor-only).
+// Unchecking a player whose line already has stats is refused with a hint (lineup-error); a
+// saved all-zero line may be unchecked and is removed on Save (0028 lets a scorekeeper delete it).
 export function ScoringLineup({
   scoring,
   roster,
-  isEditor,
 }: {
   scoring: Scoring;
   roster: ScoringPlayer[];
-  isEditor: boolean;
 }) {
   const { state, commit, ready } = scoring;
   const lines = state.statLines;
@@ -32,10 +30,6 @@ export function ScoringLineup({
     const line = lines[player.id];
     if (!on && line && !isZeroLine(line)) {
       setHint(`${player.name} already has stats. Clear them in the Box score first.`);
-      return;
-    }
-    if (!on && line && !isEditor) {
-      setHint(`${player.name} is already saved in the lineup. Only an editor can take a player off.`);
       return;
     }
     setHint(null);

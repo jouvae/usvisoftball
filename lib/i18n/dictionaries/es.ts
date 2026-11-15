@@ -33,7 +33,7 @@ export const es = {
   schedule: {
     eventsTitle: "Eventos",
     eventsIntro:
-      "Juegos, ceremonias y resultados. Las horas se muestran en la hora local de la sede, junto con la hora del Atlántico (USVI).",
+      "Juegos, ceremonias y resultados. Las horas marcadas como “local” son la hora local de la sede; AST es la hora de USVI.",
     eventsMetaTitle: "Eventos y calendario — Federación de Sóftbol de las Islas Vírgenes de EE. UU.",
     viewLabel: "Vista",
     viewList: "Lista",
@@ -51,7 +51,8 @@ export const es = {
     inning: "Entrada",
     whenWhere: "Cuándo y dónde",
     localTime: "Hora local",
-    atlanticTime: "Hora de USVI",
+    localShort: "local",
+    atlanticTime: "hora de USVI",
     venue: "Sede",
     map: "Abrir en Google Maps",
     addToCalendar: "Añadir al calendario",

@@ -43,7 +43,9 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
             {t.eventsTitle}
           </h1>
         </div>
-        <p className="max-w-3xl text-lg text-muted">{t.eventsIntro}</p>
+        <p data-testid="events-intro" className="max-w-3xl text-lg text-muted">
+          {t.eventsIntro}
+        </p>
       </div>
 
       <EventsView

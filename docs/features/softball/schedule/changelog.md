@@ -79,3 +79,40 @@ match the box-score hits.
 saved, even when that player's line is all zeros. The UI and the action refuse this with a
 plain-language hint and make no partial write. A follow-up migration could allow scorekeepers to
 delete all-zero lines.
+
+## 2026-11-15 — Polish pass (status.md "Polish backlog")
+
+**Built:**
+- **One section order everywhere.** `EventDetail` is now a single column whose DOM order is the
+  visual order in page, modal and drawer: header → When & where (time, venue, map, Add to
+  calendar, Share) → Watch live (own section) → Line score → Box score → Roster. Each root carries
+  `data-section`. The desktop modal used to put Line score/Roster above When & where (CSS `order`
+  at `lg`). The direct-load page narrowed to `max-w-4xl` to match.
+- **Status chips only when they say something.** Pregame rows, cards and the detail header show
+  no visible chip; `event-row-status` / `event-state` stay as a visually-hidden "Upcoming"/"Próximo".
+  Live keeps the red chip with a dot that pulses only under `motion-safe`. Final shows the score,
+  away–home: "Final · 3–1". Postponed/Cancelled unchanged.
+- **"local", not "CST".** New `venueZoneLabel` / `localTimeCaption` / `ATLANTIC_LABEL` in
+  `lib/schedule-view.ts`: venue-local times say "local" (en/es); the detail caption reads
+  "Local time · El Salvador" / "Hora local · El Salvador"; Atlantic times always say "AST" (Intl
+  `es` printed "GMT-4") with "USVI time" / "hora de USVI" in the detail. `/events` intro legend,
+  SEO meta description and the admin scoring list use the same wording.
+- **OG image:** time line is "Saturday, November 21 · 3:00 PM local · 5:00 PM AST" (`ogWhenLine`);
+  a final game shows 120px gold scores, a gold FINAL banner, and dims the loser.
+- **Stat sheet order:** AB, H, R, RBI, BB, SO, then 2B, 3B, HR, SB (`BATTING_FIELDS` in
+  `lib/scoring-view.ts`); pitching unchanged.
+- **Lineup removal trap fixed.** Migration `0028_scorekeeper_zero_line_delete.sql` (additive,
+  replayable; applied twice) adds a scorekeeper DELETE policy on `game_player_stats` allowed only
+  when every batting stat is 0 and every pitching column is NULL or 0. Proven in a rolled-back
+  transaction as a temp scorekeeper: zero line deleted = 1; AB-1 line = 0; 1-out-pitched line = 0
+  (before 0028 the zero line was also 0). `setLineup` no longer refuses a non-editor removing a
+  zero line; a line with stats is still refused (`lineup-error`).
+
+**Tests:** new `tests/unit/schedule-polish.test.ts` (10) and `schedule-web-030` (section order,
+DOM + on-screen, modal desktop / drawer mobile / page; red against the old layout). Updated, with
+the old behavior deliberately changed: `schedule-web-010` (pregame chip is sr-only "Upcoming";
+Final chip "Final · 3–1"; row time says "local", not "CST"; intro legend), `-012` (pregame card chip
+sr-only), `-015` ("Local time · El Salvador", "AST · USVI time", sr-only pregame header state, Final
+score), `-020` (es "Hora local · El Salvador", "AST · hora de USVI"), `schedule-e2e-005` (the
+scorekeeper now saves both, then unchecks a zero line and it is removed after reload — previously
+the scenario only unchecked before the first save; plus stat-sheet order). No coverage removed.

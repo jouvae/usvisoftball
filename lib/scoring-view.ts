@@ -1,6 +1,7 @@
 import {
   isUsviGame,
   localDateKey,
+  type BattingLine,
   type EventDetail,
   type EventWithGame,
   type Game,
@@ -266,6 +267,21 @@ export function applyOp(state: ScoringState, op: ScoringOp | ScoringOpDraft): Sc
 function cloneLine(line: StatLineInput): StatLineInput {
   return { ...line, pitching: line.pitching ? { ...line.pitching } : null };
 }
+
+// The stat sheet's batting steppers, in scorebook order (polish 2026-11-15): the counting stats a
+// scorekeeper taps most — AB H R RBI BB SO — then the extra-base hits and steals.
+export const BATTING_FIELDS: readonly { key: keyof BattingLine; label: string }[] = [
+  { key: "ab", label: "At bats" },
+  { key: "h", label: "Hits" },
+  { key: "r", label: "Runs" },
+  { key: "rbi", label: "Runs batted in" },
+  { key: "bb", label: "Walks" },
+  { key: "so", label: "Strikeouts" },
+  { key: "doubles", label: "Doubles" },
+  { key: "triples", label: "Triples" },
+  { key: "hr", label: "Home runs" },
+  { key: "sb", label: "Stolen bases" },
+];
 
 // A fresh all-zero batting line that did not pitch — what a lineup check creates.
 export function zeroStatLine(): StatLineInput {

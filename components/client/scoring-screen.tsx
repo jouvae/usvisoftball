@@ -141,11 +141,7 @@ export function ScoringScreen({
               isEditor={isEditor}
             />
           ) : tab === "lineup" ? (
-            <ScoringLineup
-              scoring={scoring}
-              roster={roster}
-              isEditor={isEditor}
-            />
+            <ScoringLineup scoring={scoring} roster={roster} />
           ) : (
             <ScoringBoxScore scoring={scoring} players={players} />
           )}

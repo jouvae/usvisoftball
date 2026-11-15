@@ -11,8 +11,8 @@ import {
   gameWinner,
   googleMapsUrl,
   isUsviTeam,
+  localTimeCaption,
   runTotals,
-  timeZoneLabel,
   type EventDetail as EventDetailData,
   type Locale,
   type Side,
@@ -28,10 +28,11 @@ export type EventPresentation = "page" | "modal" | "drawer";
 
 // One event's detail (D7/D12) — the SAME component for the full page (direct load) and the
 // in-site modal (≥ md) / drawer (< md); `presentation` only changes density and heading level.
-// Sections top → bottom: header (teams, state, score) · when & where (venue-local + USVI time,
-// venue, map, .ics) · watch live · line score · box score (USVI lines) · roster (USVI sides) ·
-// share. Ceremonies: header + when & where. Isomorphic (no hooks) so the client sheet can render
-// it with the same data the server page does.
+// Sections top → bottom, IDENTICAL in every presentation (DOM order = visual order; each root
+// carries data-section, schedule-web-030): header (teams, state, score) · when & where
+// (venue-local + USVI time, venue, map, Add to calendar, Share) · watch live · line score · box
+// score (USVI lines) · roster (USVI sides). Ceremonies: header + when & where (+ watch live).
+// Isomorphic (no hooks) so the client sheet can render it with the same data the server page does.
 export function EventDetail({
   event,
   locale,
@@ -106,7 +107,7 @@ export function EventDetail({
       data-slug={event.slug}
       className={`flex flex-col gap-6 ${className}`}
     >
-      <header data-testid="event-detail-header" className="flex flex-col gap-4">
+      <header data-testid="event-detail-header" data-section="header" className="flex flex-col gap-4">
         {tournamentName || round ? (
           <p className="flex flex-wrap items-center gap-x-2 text-sm font-semibold uppercase tracking-wide text-muted">
             {tournament ? (
@@ -154,25 +155,15 @@ export function EventDetail({
         )}
       </header>
 
-      <div className={isPage ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start" : "flex flex-col gap-6"}>
-        <div className="order-2 flex min-w-0 flex-col gap-8 lg:order-1">
-          {game ? <LineScore game={game} locale={locale} /> : null}
-          {game && usviLines.length > 0 ? <BoxScore lines={usviLines} locale={locale} /> : null}
-          {game && usviSides.length > 0 ? (
-            <Roster
-              locale={locale}
-              sides={usviSides.map((s) => ({ team: game[s], players: event.rosters[s] }))}
-            />
-          ) : null}
-        </div>
-
-        <aside
-          aria-label={t.whenWhere}
-          className={`order-1 flex flex-col gap-4 rounded-2xl bg-surface p-5 ring-1 ring-border lg:order-2 ${game ? "" : "lg:col-span-2"}`}
-        >
-          <h2 className="font-display text-lg font-bold uppercase tracking-wide text-navy">
-            {t.whenWhere}
-          </h2>
+      <section
+        data-section="when-where"
+        aria-label={t.whenWhere}
+        className="flex flex-col gap-4 rounded-2xl bg-surface p-5 ring-1 ring-border"
+      >
+        <h2 className="font-display text-lg font-bold uppercase tracking-wide text-navy">
+          {t.whenWhere}
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className={row}>
             <Clock aria-hidden="true" className={icon} />
             <div className="flex flex-col gap-1">
@@ -184,7 +175,7 @@ export function EventDetail({
                   {formatEventTime(event.startsAt, tz, locale)}
                 </time>{" "}
                 <span className="text-sm text-muted">
-                  {timeZoneLabel(event.startsAt, tz, locale)} · {t.localTime}
+                  {localTimeCaption(tz, tournament?.countryCode, locale)}
                 </span>
               </p>
               {tz !== ATLANTIC_TZ ? (
@@ -192,7 +183,7 @@ export function EventDetail({
                   <span className="font-semibold text-foreground">
                     {formatEventTime(event.startsAt, ATLANTIC_TZ, locale)}
                   </span>{" "}
-                  {timeZoneLabel(event.startsAt, ATLANTIC_TZ, locale)} · {t.atlanticTime}
+                  {localTimeCaption(ATLANTIC_TZ, null, locale)}
                 </p>
               ) : null}
             </div>
@@ -216,38 +207,60 @@ export function EventDetail({
               </a>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <a
-              href={icsHref}
-              download
-              data-testid="event-detail-ics"
-              className={`${action} bg-white text-navy ring-1 ring-navy/30 hover:bg-white/70`}
-            >
-              <CalendarPlus aria-hidden="true" className="size-4" />
-              {t.addToCalendar}
-            </a>
-            {event.streamUrl ? (
-              <a
-                href={event.streamUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="event-detail-stream"
-                className={`${action} bg-accent text-accent-foreground hover:bg-accent-hover`}
-              >
-                <Tv aria-hidden="true" className="size-4" />
-                {t.watchLive}
-              </a>
-            ) : null}
-            <ShareButton
-              path={path}
-              title={title}
-              label={t.share}
-              copiedLabel={t.shareCopied}
-              className="bg-white"
-            />
-          </div>
-        </aside>
-      </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={icsHref}
+            download
+            data-testid="event-detail-ics"
+            className={`${action} bg-white text-navy ring-1 ring-navy/30 hover:bg-white/70`}
+          >
+            <CalendarPlus aria-hidden="true" className="size-4" />
+            {t.addToCalendar}
+          </a>
+          <ShareButton
+            path={path}
+            title={title}
+            label={t.share}
+            copiedLabel={t.shareCopied}
+            className="bg-white"
+          />
+        </div>
+      </section>
+
+      {event.streamUrl ? (
+        <section data-section="watch-live" aria-label={t.watchLive}>
+          <a
+            href={event.streamUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="event-detail-stream"
+            className={`${action} w-full justify-center bg-accent text-accent-foreground hover:bg-accent-hover sm:w-auto`}
+          >
+            <Tv aria-hidden="true" className="size-4" />
+            {t.watchLive}
+          </a>
+        </section>
+      ) : null}
+
+      {game ? (
+        <div data-section="linescore">
+          <LineScore game={game} locale={locale} />
+        </div>
+      ) : null}
+      {game && usviLines.length > 0 ? (
+        <div data-section="boxscore">
+          <BoxScore lines={usviLines} locale={locale} />
+        </div>
+      ) : null}
+      {game && usviSides.length > 0 ? (
+        <div data-section="roster">
+          <Roster
+            locale={locale}
+            sides={usviSides.map((s) => ({ team: game[s], players: event.rosters[s] }))}
+          />
+        </div>
+      ) : null}
     </article>
   );
 }
