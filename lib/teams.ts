@@ -6,6 +6,7 @@ import {
   type Island,
   type Team,
   type TeamKind,
+  type MemberTeamKind,
   type TeamPlayer,
   type TeamWithRoster,
   ISLAND_LABELS,
@@ -26,6 +27,7 @@ export {
   type Island,
   type Team,
   type TeamKind,
+  type MemberTeamKind,
   type TeamPlayer,
   type TeamWithRoster,
   ISLAND_LABELS,
@@ -33,7 +35,7 @@ export {
   TEAM_KIND_LABELS,
 };
 
-type PlayerRow = {
+export type PlayerRow = {
   id: string;
   name: string;
   jersey_number: number | null;
@@ -42,9 +44,10 @@ type PlayerRow = {
   hometown: string;
   photo_url: string;
   sort_order: number;
+  active: boolean;
 };
 
-function toPlayer(row: PlayerRow): TeamPlayer {
+export function toPlayer(row: PlayerRow): TeamPlayer {
   return {
     id: row.id,
     name: row.name,
@@ -54,11 +57,12 @@ function toPlayer(row: PlayerRow): TeamPlayer {
     hometown: row.hometown,
     photoUrl: row.photo_url,
     sortOrder: row.sort_order,
+    active: row.active,
   };
 }
 
-const PLAYER_COLUMNS =
-  "id,name,jersey_number,position,bats_throws,hometown,photo_url,sort_order";
+export const PLAYER_COLUMNS =
+  "id,name,jersey_number,position,bats_throws,hometown,photo_url,sort_order,active";
 
 type TeamRow = {
   id: string;
@@ -67,6 +71,7 @@ type TeamRow = {
   kind: TeamKind;
   short_name: string;
   island: Island | null;
+  country_code: string | null;
   division: string;
   description: string;
   logo_url: string;
@@ -84,6 +89,7 @@ function toTeam(row: TeamRow): Team {
     kind: row.kind,
     shortName: row.short_name,
     island: row.island,
+    countryCode: row.country_code,
     division: row.division,
     description: row.description,
     logoUrl: row.logo_url,
@@ -95,7 +101,7 @@ function toTeam(row: TeamRow): Team {
 }
 
 const COLUMNS =
-  "id,name,slug,kind,short_name,island,division,description,logo_url,cover_image_url,home_venue,founded_year,sort_order";
+  "id,name,slug,kind,short_name,island,country_code,division,description,logo_url,cover_image_url,home_venue,founded_year,sort_order";
 
 // All teams — or only one `kind` — ordered (sort_order, then name). Bounded read.
 export async function listTeams(

@@ -1,0 +1,443 @@
+// Feature softball/schedule — CLIENT-SAFE view types, constants + pure helpers.
+//
+// No `server-only`, no Supabase client — safe to import from Client Components (the events
+// list, the event modal/drawer, the scorekeeper screens). lib/schedule.ts (server-only)
+// re-exports every symbol here. Same split as lib/teams-view.ts / lib/events-view.ts.
+//
+// Model (overview §2, D1): a Tournament groups CalendarEvents; a Game is the sports data for
+// exactly one event. Run totals and tournament dates are DERIVED here, never stored. Every
+// helper is pure and timezone-explicit so server and client render identically (Vitest:
+// tests/unit, scenarios schedule-unit-001..009).
+
+import type { Locale } from "@/lib/i18n/locale";
+import type { TeamKind, TeamPlayer } from "@/lib/teams-view";
+
+export type { Locale };
+
+// ── Constants ────────────────────────────────────────────────────────────────────
+
+// The USVI's IANA zone (Atlantic Standard Time, UTC−4, no DST). USVI fans read times here.
+export const ATLANTIC_TZ = "America/St_Thomas";
+
+// ISO 3166-1 alpha-2 code for the U.S. Virgin Islands — marks "our" teams and games.
+export const USVI_COUNTRY = "VI";
+
+// Regulation innings in softball: the line score's minimum column count and the ERA base.
+export const SOFTBALL_INNINGS = 7;
+
+// ── Enums (mirror the 0026 CHECKs — keep in lockstep) ────────────────────────────
+
+// calendar_events.type
+export type EventType = "game" | "ceremony" | "other";
+
+// calendar_events.status
+export type EventStatus = "scheduled" | "postponed" | "cancelled";
+
+// games.state
+export type GameState = "pregame" | "live" | "final";
+
+// game_innings.side — "A vs B" on the flyer = A away, B home.
+export type Side = "away" | "home";
+
+// ── Rows (camelCase views of the 0026 tables) ────────────────────────────────────
+
+// A tournament: a named group of events (0026 `tournaments`). Dates are derived (D2).
+export interface Tournament {
+  id: string;
+  name: string;
+  nameEs: string; // '' → fall back to name
+  slug: string;
+  description: string;
+  descriptionEs: string; // '' → fall back to description
+  city: string;
+  countryCode: string | null;
+  timezone: string; // IANA, venue-local (e.g. 'America/El_Salvador')
+  logoUrl: string;
+  coverImageUrl: string;
+  streamUrl: string | null; // https only (0026 CHECK)
+  announcedStart: string | null; // 'YYYY-MM-DD'; used only while there are no events
+  announcedEnd: string | null;
+  sortOrder: number;
+}
+
+// One thing on the calendar (0026 `calendar_events`). Games carry no game data here.
+export interface CalendarEvent {
+  id: string;
+  tournamentId: string | null;
+  type: EventType;
+  slug: string;
+  title: string; // non-games only; games are titled from their teams
+  titleEs: string; // '' → fall back to title
+  startsAt: string; // ISO timestamptz
+  endsAt: string | null;
+  venue: string;
+  round: string; // dictionary KEY, e.g. 'opening_round'; '' = none
+  status: EventStatus;
+  streamUrl: string | null; // https only (0026 CHECK)
+  sortOrder: number;
+}
+
+// The lightweight team shape the schedule renders (TeamBadge, names, flags, links).
+export interface ScheduleTeam {
+  id: string;
+  name: string;
+  slug: string;
+  kind: TeamKind; // 'guest' = opponent (D5)
+  shortName: string;
+  countryCode: string | null; // ISO alpha-2; 'VI' for USVI national teams
+  division: string;
+  logoUrl: string; // USVI teams only in practice — no federation logos for guests (D5)
+}
+
+// The sports data for exactly one event (0026 `games`). R is derived from innings.
+export interface Game {
+  id: string;
+  eventId: string;
+  awayTeamId: string;
+  homeTeamId: string;
+  state: GameState;
+  currentInning: number | null;
+  awayHits: number;
+  awayErrors: number;
+  homeHits: number;
+  homeErrors: number;
+}
+
+// One half-inning cell of the line score (0026 `game_innings`).
+export interface Inning {
+  inning: number; // ≥ 1
+  side: Side;
+  runs: number; // ≥ 0
+}
+
+// Batting columns of a stat line.
+export interface BattingLine {
+  ab: number;
+  r: number;
+  h: number;
+  doubles: number;
+  triples: number;
+  hr: number;
+  rbi: number;
+  bb: number;
+  so: number;
+  sb: number;
+}
+
+// Pitching columns of a stat line. Innings pitched is stored as OUTS (14 → "4⅔").
+export interface PitchingLine {
+  outsPitched: number;
+  h: number;
+  r: number;
+  er: number;
+  bb: number;
+  so: number;
+}
+
+// One player's box-score line for one game (0026 `game_player_stats`). pitching null =
+// did not pitch (outs_pitched IS NULL).
+export interface PlayerStatLine extends BattingLine {
+  id: string;
+  gameId: string;
+  playerId: string;
+  teamId: string;
+  pitching: PitchingLine | null;
+}
+
+// A stat line joined to its player for rendering (name, number, position).
+export interface PlayerStatLineWithPlayer extends PlayerStatLine {
+  player: Pick<TeamPlayer, "id" | "name" | "jerseyNumber" | "position">;
+}
+
+// ── Composites (what the server reads return) ────────────────────────────────────
+
+// A game with both teams resolved and its line-score cells.
+export interface GameWithTeams extends Game {
+  away: ScheduleTeam;
+  home: ScheduleTeam;
+  innings: Inning[];
+}
+
+// A calendar event with its game (null for ceremonies/other) — the list/card row shape.
+// `timezone` is the tournament's venue-local zone (ATLANTIC_TZ when no tournament).
+export interface EventWithGame extends CalendarEvent {
+  timezone: string;
+  tournament: Pick<Tournament, "id" | "name" | "nameEs" | "slug"> | null;
+  game: GameWithTeams | null;
+}
+
+// Everything the /events/[slug] page renders: event + game + teams + innings + box score +
+// USVI rosters (active players only; guests have none → empty arrays).
+export interface EventDetail extends EventWithGame {
+  tournamentDetail: Tournament | null;
+  statLines: PlayerStatLineWithPlayer[];
+  rosters: Record<Side, TeamPlayer[]>;
+}
+
+// Derived R per side.
+export interface RunTotals {
+  away: number;
+  home: number;
+}
+
+// A tournament's displayed window (D2). 'events' → ISO timestamps (first start, last
+// coalesce(end,start)); 'announced' → 'YYYY-MM-DD' dates.
+export interface TournamentWindow {
+  start: string;
+  end: string;
+  source: "events" | "announced";
+}
+
+// Input to eventSlug(): games are named from their teams' English country names and the
+// venue-local date; ceremonies/other from the tournament slug + title.
+export type EventSlugInput =
+  | {
+      type: "game";
+      awayCountryCode: string;
+      homeCountryCode: string;
+      localDate: string; // 'YYYY-MM-DD', venue-local
+    }
+  | {
+      type: "ceremony" | "other";
+      tournamentSlug: string | null;
+      title: string;
+    };
+
+// A stat line as entered (no ids) — what validateStatLine() checks.
+export type StatLineInput = BattingLine & { pitching: PitchingLine | null };
+
+// validateStatLine() result: ok, or the first offending field + a plain-language message.
+export type StatLineValidation =
+  | { ok: true }
+  | { ok: false; field: keyof BattingLine | `pitching.${keyof PitchingLine}`; message: string };
+
+// ── Pure helpers ─────────────────────────────────────────────────────────────────
+
+// The "no value" placeholder (U+2013 en dash).
+const DASH = "–";
+
+// Sum runs per side from the line-score cells; no innings → { away: 0, home: 0 }.
+export function runTotals(innings: readonly Inning[]): RunTotals {
+  const totals: RunTotals = { away: 0, home: 0 };
+  for (const cell of innings) totals[cell.side] += cell.runs;
+  return totals;
+}
+
+// Number of line-score columns to render: max(SOFTBALL_INNINGS, highest inning, current).
+export function lineScoreInningCount(
+  innings: readonly Inning[],
+  currentInning: number | null,
+): number {
+  return Math.max(SOFTBALL_INNINGS, currentInning ?? 0, ...innings.map((c) => c.inning));
+}
+
+// The winning side of a FINAL game by derived runs; null when not final or tied.
+export function gameWinner(game: Pick<Game, "state">, totals: RunTotals): Side | null {
+  if (game.state !== "final" || totals.away === totals.home) return null;
+  return totals.away > totals.home ? "away" : "home";
+}
+
+// Tournament window (D2): events win; else announced dates; else null ("Dates to be announced").
+export function tournamentWindow(
+  events: readonly Pick<CalendarEvent, "startsAt" | "endsAt">[],
+  tournament: Pick<Tournament, "announcedStart" | "announcedEnd">,
+): TournamentWindow | null {
+  if (events.length > 0) {
+    let start = events[0].startsAt;
+    let end = events[0].endsAt ?? events[0].startsAt;
+    for (const e of events) {
+      const last = e.endsAt ?? e.startsAt;
+      if (Date.parse(e.startsAt) < Date.parse(start)) start = e.startsAt;
+      if (Date.parse(last) > Date.parse(end)) end = last;
+    }
+    return { start, end, source: "events" };
+  }
+  if (tournament.announcedStart && tournament.announcedEnd) {
+    return { start: tournament.announcedStart, end: tournament.announcedEnd, source: "announced" };
+  }
+  return null;
+}
+
+// Localized country name via Intl.DisplayNames (es 'VI' → "Islas Vírgenes de EE. UU.").
+export function countryName(countryCode: string, locale: Locale): string {
+  const code = countryCode.toUpperCase();
+  try {
+    return new Intl.DisplayNames(locale, { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+// Localized team name: national/guest with a country → countryName(); otherwise team.name.
+export function teamDisplayName(
+  team: Pick<ScheduleTeam, "name" | "kind" | "countryCode">,
+  locale: Locale,
+): string {
+  if ((team.kind === "national" || team.kind === "guest") && team.countryCode) {
+    return countryName(team.countryCode, locale);
+  }
+  return team.name;
+}
+
+// Event display title: a game → "{away} vs {home}" (localized); else title / titleEs.
+export function eventDisplayTitle(
+  event: Pick<EventWithGame, "type" | "title" | "titleEs" | "game">,
+  locale: Locale,
+): string {
+  if (event.type === "game" && event.game) {
+    return `${teamDisplayName(event.game.away, locale)} vs ${teamDisplayName(event.game.home, locale)}`;
+  }
+  return locale === "es" && event.titleEs ? event.titleEs : event.title;
+}
+
+// Clock time of an instant in a zone, Intl-formatted (en "3:00 PM", es "3:00 p. m."). Always
+// 12-hour — Intl 'es' would otherwise default to "15:00".
+export function formatEventTime(iso: string, timeZone: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone,
+  }).format(new Date(iso));
+}
+
+// Short zone label for an instant in a zone, so every time names its zone (e.g. "AST").
+export function timeZoneLabel(iso: string, timeZone: string, locale: Locale): string {
+  const part = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: "short" })
+    .formatToParts(new Date(iso))
+    .find((p) => p.type === "timeZoneName");
+  return part?.value ?? timeZone;
+}
+
+// Long date label of an instant in a zone (en "Saturday, November 21", es "sábado, 21 de noviembre").
+export function formatEventDate(iso: string, timeZone: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone,
+  }).format(new Date(iso));
+}
+
+// Calendar date 'YYYY-MM-DD' of an instant in a zone — the day-grouping and slug key.
+export function localDateKey(iso: string, timeZone: string): string {
+  // en-CA formats dates as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone,
+  }).format(new Date(iso));
+}
+
+// Innings pitched from outs: 14 → "4⅔", 0 → "0", 3 → "1", 10 → "3⅓".
+export function formatInningsPitched(outs: number): string {
+  const whole = Math.floor(outs / 3);
+  const frac = ["", "⅓", "⅔"][outs % 3];
+  if (!frac) return String(whole);
+  return whole === 0 ? frac : `${whole}${frac}`;
+}
+
+// A rate as baseball-style ".333" (leading zero dropped; "1.000" kept).
+function formatRate(value: number): string {
+  return value.toFixed(3).replace(/^0(?=\.)/, "");
+}
+
+// AVG = H/AB as ".333"; "–" when AB is 0.
+export function battingAverage(line: Pick<BattingLine, "ab" | "h">): string {
+  return line.ab === 0 ? DASH : formatRate(line.h / line.ab);
+}
+
+// OBP = (H+BB)/(AB+BB) as ".400"; "–" when the denominator is 0.
+export function onBasePct(line: Pick<BattingLine, "ab" | "h" | "bb">): string {
+  const denom = line.ab + line.bb;
+  return denom === 0 ? DASH : formatRate((line.h + line.bb) / denom);
+}
+
+// ERA = ER × SOFTBALL_INNINGS / IP as "2.33"; "–" when 0 outs.
+export function era(line: Pick<PitchingLine, "outsPitched" | "er">): string {
+  if (line.outsPitched <= 0) return DASH;
+  return ((line.er * SOFTBALL_INNINGS * 3) / line.outsPitched).toFixed(2);
+}
+
+// URL-safe slug fragment: lowercase ASCII, accents stripped, dots dropped ("U.S." → "us"),
+// other non-alphanumerics → '-'.
+export function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// Event slug: game `{away}-vs-{home}-{yyyy-mm-dd}` (English country names, e.g.
+// colombia-vs-us-virgin-islands-2026-11-21); ceremony/other `{tournament-slug}-{title}`.
+export function eventSlug(input: EventSlugInput): string {
+  if (input.type === "game") {
+    const away = slugify(countryName(input.awayCountryCode, "en"));
+    const home = slugify(countryName(input.homeCountryCode, "en"));
+    return `${away}-vs-${home}-${input.localDate}`;
+  }
+  const title = slugify(input.title);
+  return input.tournamentSlug ? `${input.tournamentSlug}-${title}` : title;
+}
+
+const BATTING_FIELDS: readonly (keyof BattingLine)[] = [
+  "ab", "r", "h", "doubles", "triples", "hr", "rbi", "bb", "so", "sb",
+];
+const PITCHING_FIELDS: readonly (keyof PitchingLine)[] = ["outsPitched", "h", "r", "er", "bb", "so"];
+
+// Reject impossible lines (H > AB, 2B+3B+HR > H, ER > R, any negative) with a plain message.
+export function validateStatLine(line: StatLineInput): StatLineValidation {
+  for (const f of BATTING_FIELDS) {
+    if (!Number.isInteger(line[f]) || line[f] < 0) {
+      return { ok: false, field: f, message: "Numbers can't be negative." };
+    }
+  }
+  if (line.h > line.ab) {
+    return { ok: false, field: "h", message: "Hits can't be more than at-bats." };
+  }
+  if (line.doubles + line.triples + line.hr > line.h) {
+    return {
+      ok: false,
+      field: "h",
+      message: "Doubles, triples and home runs together can't be more than hits.",
+    };
+  }
+  const p = line.pitching;
+  if (p) {
+    for (const f of PITCHING_FIELDS) {
+      if (!Number.isInteger(p[f]) || p[f] < 0) {
+        return { ok: false, field: `pitching.${f}`, message: "Numbers can't be negative." };
+      }
+    }
+    if (p.er > p.r) {
+      return {
+        ok: false,
+        field: "pitching.er",
+        message: "Earned runs can't be more than runs allowed.",
+      };
+    }
+  }
+  return { ok: true };
+}
+
+// Regional-indicator flag emoji from an alpha-2 code ('VI' → "🇻🇮"); invalid → "".
+export function flagEmoji(countryCode: string | null | undefined): string {
+  if (!countryCode || !/^[A-Za-z]{2}$/.test(countryCode)) return "";
+  return String.fromCodePoint(
+    ...[...countryCode.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
+  );
+}
+
+// True when the team represents the USVI (countryCode === USVI_COUNTRY).
+export function isUsviTeam(team: Pick<ScheduleTeam, "countryCode">): boolean {
+  return team.countryCode === USVI_COUNTRY;
+}
+
+// True when either side of the game is a USVI team (row highlight, ?team=usvi filter).
+export function isUsviGame(game: Pick<GameWithTeams, "away" | "home"> | null): boolean {
+  return game != null && (isUsviTeam(game.away) || isUsviTeam(game.home));
+}

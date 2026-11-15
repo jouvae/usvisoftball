@@ -5,7 +5,7 @@ import { useActionState } from "react";
 // view module (no `server-only`), NEVER from "@/lib/teams" (server-only). Team is
 // a type-only import from the same client-safe module.
 import { ISLAND_LABELS, TEAM_KIND_LABELS, safeLogoHref } from "@/lib/teams-view";
-import type { Team, Island, TeamKind } from "@/lib/teams-view";
+import type { Team, Island, MemberTeamKind } from "@/lib/teams-view";
 import type { TeamActionState } from "@/app/admin/(protected)/teams/actions";
 
 // The team form island (teams-e2e-003). ONE island serves BOTH add and edit: the caller
@@ -42,7 +42,7 @@ export function TeamForm({
   );
 
   const islandKeys = Object.keys(ISLAND_LABELS) as Island[];
-  const kindKeys = Object.keys(TEAM_KIND_LABELS) as TeamKind[];
+  const kindKeys = Object.keys(TEAM_KIND_LABELS) as MemberTeamKind[];
   const currentLogo = team?.logoUrl ?? "";
   const previewSrc = safeLogoHref(currentLogo); // guard the preview too
   const localPathValue = currentLogo.startsWith("/") ? currentLogo : "";
