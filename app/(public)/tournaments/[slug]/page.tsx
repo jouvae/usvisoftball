@@ -15,7 +15,7 @@ import {
 import { alternatesFor, getLocale, getT } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/locale";
 import { EVENTS_ENABLED } from "@/lib/flags";
-import { EventsView, type EventsViewMode } from "@/components/ui/events-view";
+import { EventsView, parseEventsParams } from "@/components/ui/events-view";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { AccentRule } from "@/components/ui/motifs/accent-rule";
 import { LiveRefresh } from "@/components/client/live-refresh";
@@ -53,8 +53,7 @@ export default async function TournamentPage({
   const tournament = await getTournamentBySlug(slug);
   if (!tournament) notFound();
 
-  const view: EventsViewMode = sp.view === "cards" ? "cards" : "list";
-  const usviOnly = sp.team === "usvi";
+  const { view, usviOnly, date, month } = parseEventsParams(sp);
   const [all, shown, locale, dict] = await Promise.all([
     listEvents({ tournamentId: tournament.id }),
     usviOnly
@@ -148,6 +147,8 @@ export default async function TournamentPage({
             path={`/tournaments/${tournament.slug}`}
             view={view}
             usviOnly={usviOnly}
+            date={date}
+            month={month}
             now={new Date()}
           />
         </section>

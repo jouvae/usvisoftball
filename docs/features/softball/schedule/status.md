@@ -21,7 +21,7 @@
 | S2 i18n foundation | ✅ `a45ad9e` | /es rewrite, dictionaries, switcher, hreflang; canonical = usvisoftball.org |
 | S3 Public schedule | ✅ `44bd7ad` | list/cards, modal+drawer (intercepting route, works under /es), JSON-LD, OG, .ics, tournament + guest team pages |
 | S4 Scorekeeper | in progress | 0027 applied (scorekeeper column guard) |
-| S5 Timeline/calendar, sitemap, rest of Spanish, contract migration | todo | |
+| S5 Timeline/calendar, sitemap, rest of Spanish, contract migration | in progress (uncommitted) | timeline + calendar views, list `?date=` filter, sitemap.xml + robots.txt GREEN (unit-011..014, web-021..023; desktop + mobile). Remaining: rest of Spanish page bodies, contract migration |
 
 ## Open questions (owner: human)
 - Opponent box scores (D6) — board decision.

@@ -593,3 +593,98 @@ export function googleMapsUrl(venue: string, place = ""): string {
 export function hasLiveGame(events: readonly Pick<EventWithGame, "game">[]): boolean {
   return events.some((e) => e.game?.state === "live");
 }
+
+// ── S5 timeline + calendar helpers (pure) ────────────────────────────────────────
+
+// How long an event without `endsAt` is assumed to run (timeline range + item width).
+export const DEFAULT_EVENT_HOURS = 2;
+
+// An hour window of a venue-local day, in whole hours (0 ≤ startHour < endHour ≤ 24).
+export interface TimelineRange {
+  startHour: number;
+  endHour: number;
+}
+
+const HOUR_MS = 3_600_000;
+
+// Venue-local clock time of an instant as fractional hours since local midnight (12:30 → 12.5).
+export function localHours(iso: string, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone,
+    })
+      .formatToParts(new Date(iso))
+      .map((p) => [p.type, p.value]),
+  );
+  return Number(parts.hour) % 24 + Number(parts.minute) / 60;
+}
+
+// 'YYYY-MM-DD' of a UTC calendar date (helper for the month grid).
+function utcDateKey(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// A month as whole weeks of 'YYYY-MM-DD' dates (leading/trailing days from the neighbouring
+// months included). `month` is 1–12; weekStartsOn 0 = Sunday (en), 1 = Monday (es).
+export function calendarMonthGrid(year: number, month: number, weekStartsOn: 0 | 1): string[][] {
+  const first = Date.UTC(year, month - 1, 1);
+  const last = Date.UTC(year, month, 0);
+  const lead = (new Date(first).getUTCDay() - weekStartsOn + 7) % 7;
+  const trail = (weekStartsOn + 6 - new Date(last).getUTCDay() + 7) % 7;
+  const total = lead + new Date(last).getUTCDate() + trail;
+  const weeks: string[][] = [];
+  for (let i = 0; i < total; i++) {
+    if (i % 7 === 0) weeks.push([]);
+    weeks[weeks.length - 1].push(utcDateKey(first + (i - lead) * 24 * HOUR_MS));
+  }
+  return weeks;
+}
+
+// The venue-local hour window a day's timeline spans: floor of the earliest start, ceil of the
+// latest end (endsAt, else start + DEFAULT_EVENT_HOURS), capped at 24. Empty → 8 … 20.
+export function timelineRange(
+  events: readonly Pick<CalendarEvent, "startsAt" | "endsAt">[],
+  timeZone: string,
+): TimelineRange {
+  if (events.length === 0) return { startHour: 8, endHour: 20 };
+  let start = Infinity;
+  let end = -Infinity;
+  for (const e of events) {
+    const s = localHours(e.startsAt, timeZone);
+    const durationH = e.endsAt
+      ? Math.max(0, (Date.parse(e.endsAt) - Date.parse(e.startsAt)) / HOUR_MS)
+      : DEFAULT_EVENT_HOURS;
+    start = Math.min(start, s);
+    end = Math.max(end, s + durationH);
+  }
+  const startHour = Math.floor(start);
+  return { startHour, endHour: Math.max(startHour + 1, Math.min(24, Math.ceil(end))) };
+}
+
+// Where an instant falls in a timeline range, as a fraction 0..1 (clamped), in venue-local time.
+export function timelinePosition(iso: string, range: TimelineRange, timeZone: string): number {
+  const f = (localHours(iso, timeZone) - range.startHour) / (range.endHour - range.startHour);
+  return Math.min(1, Math.max(0, f));
+}
+
+// The calendar's default month 'YYYY-MM': the month of the first event whose venue-local date
+// is today or later (an event earlier today counts); none upcoming → the latest event's month;
+// no events → the current month. Each event's own `timezone` wins over `timeZone` when present.
+export function defaultCalendarMonth(
+  events: readonly { startsAt: string; timezone?: string }[],
+  nowIso: string,
+  timeZone: string,
+): string {
+  let upcoming: string | null = null;
+  let latest: string | null = null;
+  for (const e of events) {
+    const tz = e.timezone ?? timeZone;
+    const date = localDateKey(e.startsAt, tz);
+    if (date >= localDateKey(nowIso, tz) && (upcoming === null || date < upcoming)) upcoming = date;
+    if (latest === null || date > latest) latest = date;
+  }
+  return (upcoming ?? latest ?? localDateKey(nowIso, timeZone)).slice(0, 7);
+}

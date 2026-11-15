@@ -24,7 +24,7 @@
 // assertion to fixture rows (data-slug in FX_EVENT_SLUGS).
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { GameState, Side } from "@/lib/schedule-view";
+import { ATLANTIC_TZ, localDateKey, type GameState, type Side } from "@/lib/schedule-view";
 
 export const SFX_TZ = "America/El_Salvador";
 
@@ -474,4 +474,33 @@ export async function seedScheduleFixtures(): Promise<ScheduleFixtureIds> {
   if (stat.error) throw stat.error;
 
   return { tournamentId, teamIds, playerIds, eventIds, gameIds };
+}
+
+// ── S5 (schedule-web-021/022) ─────────────────────────────────────────────────────
+//
+// The venue-local date ('YYYY-MM-DD') of the FIRST upcoming event across ALL calendar events
+// (real Pan Am rows included) — what the timeline's default day and the calendar's default month
+// derive from. "Upcoming" matches groupEventsByDay(): an event's venue-local date (its tournament's
+// timezone, ATLANTIC_TZ when it has none) is on/after today's venue-local date. Read-only.
+// Returns null when there are no upcoming events.
+export async function firstUpcomingLocalDate(now: Date = new Date()): Promise<string | null> {
+  const db = createAdminClient();
+  // 2-day lookback covers any zone whose "today" started before now in UTC.
+  const since = new Date(now.getTime() - 2 * 24 * 3600 * 1000).toISOString();
+  const res = await db
+    .from("calendar_events")
+    .select("starts_at, tournaments(timezone)")
+    .gte("starts_at", since)
+    .order("starts_at", { ascending: true })
+    .limit(200);
+  if (res.error) throw res.error;
+  const dates: string[] = [];
+  for (const row of res.data ?? []) {
+    const t = (row as { tournaments: { timezone: string } | { timezone: string }[] | null })
+      .tournaments;
+    const tz = (Array.isArray(t) ? t[0]?.timezone : t?.timezone) ?? ATLANTIC_TZ;
+    const date = localDateKey(row.starts_at as string, tz);
+    if (date >= localDateKey(now.toISOString(), tz)) dates.push(date);
+  }
+  return dates.length ? dates.sort()[0] : null;
 }

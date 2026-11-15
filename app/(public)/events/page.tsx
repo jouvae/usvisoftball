@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import { USVI_COUNTRY, hasLiveGame, listEvents } from "@/lib/schedule";
 import { alternatesFor, getLocale, getT } from "@/lib/i18n/server";
 import { EVENTS_ENABLED } from "@/lib/flags";
-import { EventsView, type EventsViewMode } from "@/components/ui/events-view";
+import { EventsView, parseEventsParams } from "@/components/ui/events-view";
 import { AccentRule } from "@/components/ui/motifs/accent-rule";
 import { LiveRefresh } from "@/components/client/live-refresh";
 
 // The schedule hub (overview §5): every calendar event (upcoming + past) from the 0026 tables,
-// grouped day → venue like the flyer. `?view=cards` switches List → Cards; `?team=usvi` keeps
-// only USVI games. force-dynamic: reads Supabase per request and depends on today's date.
+// grouped day → venue like the flyer. `?view=` picks List / Cards / Timeline / Calendar;
+// `?team=usvi` keeps only USVI games; `?date=` (one venue-local day) and `?month=` (calendar).
+// force-dynamic: reads Supabase per request and depends on today's date.
 export const dynamic = "force-dynamic";
 
 // Localized page (served at /events and /es/events): title, description, hreflang alternates.
@@ -24,9 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function EventsPage({ searchParams }: PageProps<"/events">) {
   if (!EVENTS_ENABLED) notFound(); // dormant for MVP launch
-  const sp = await searchParams;
-  const view: EventsViewMode = sp.view === "cards" ? "cards" : "list";
-  const usviOnly = sp.team === "usvi";
+  const { view, usviOnly, date, month } = parseEventsParams(await searchParams);
   const [events, locale, dict] = await Promise.all([
     listEvents(usviOnly ? { teamCountry: USVI_COUNTRY } : {}),
     getLocale(),
@@ -54,6 +53,8 @@ export default async function EventsPage({ searchParams }: PageProps<"/events">)
         path="/events"
         view={view}
         usviOnly={usviOnly}
+        date={date}
+        month={month}
         now={new Date()}
       />
       <LiveRefresh active={hasLiveGame(events)} />

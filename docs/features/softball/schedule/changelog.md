@@ -1,5 +1,27 @@
 # Changelog: softball/schedule
 
+## 2026-11-15 — S5 timeline, calendar, sitemap/robots
+
+**Built:** EventsView switcher gains **Timeline** and **Calendar** (`?view=timeline|calendar`).
+Timeline (`components/ui/events-timeline.tsx`): one venue-local day (pill day picker,
+`?date=`; default = first upcoming day), a lane per venue, an hour axis, items placed by
+`timelinePosition` and stacked into rows when they would overlap; each item is a real
+`<a href="/events/{slug}">` (opens the modal/drawer), USVI items gold-ruled; scrolls horizontally
+inside its own container. Calendar (`components/ui/events-calendar.tsx`): `<table>` month grid
+(Sunday-first en, Monday-first es; Intl month/weekday names), today marked `aria-current="date"`,
+muted out-of-month days, event days show a count + 🇻🇮 marker and link to
+`?view=list&date=YYYY-MM-DD` with a descriptive aria-label. List/Cards `?date=` filter with
+`events-date-clear`. Pure helpers in `lib/schedule-view.ts`: `calendarMonthGrid`, `timelineRange`,
+`timelinePosition`, `defaultCalendarMonth`, `localHours`. `app/sitemap.ts` (force-dynamic; via
+`lib/sitemap.ts`) lists static public pages, every event, tournament and team in en + es with
+hreflang en/es/x-default and `lastModified` from `updated_at`; flag-off sections omitted.
+`app/robots.ts`: allow `/`, disallow `/admin`, sitemap URL. Tournament pages share the parser
+(`parseEventsParams`). en + es strings added.
+
+**Decisions:** calendar prev/next are plain `<a>` (full navigation) — with client `<Link>` a fast
+second click hit the stale previous-month link. The mobile view switcher is a 4-column grid
+(icons hidden < sm) so all four views fit one row. Article detail pages are not in the sitemap yet.
+
 ## 2026-11-15 — S3 public schedule
 
 **Built:** `/events` (EventsView: List | Cards, `?team=usvi`, day → venue grouping by venue-local
