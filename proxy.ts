@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { homeForRoles, isScoringPath } from "@/lib/roles-view";
 import {
   LOCALE_HEADER,
   hasLocalePrefix,
@@ -38,7 +39,7 @@ function localeResponse(request: NextRequest): NextResponse {
 async function adminResponse(request: NextRequest): Promise<NextResponse> {
   // `updateSession` refreshes the auth cookie (side effect of getUser) and
   // returns the cookie-synced response we MUST return to keep cookies in sync.
-  const { response, user } = await updateSession(request);
+  const { response, user, supabase } = await updateSession(request);
 
   const { pathname } = request.nextUrl;
   if (
@@ -48,6 +49,34 @@ async function adminResponse(request: NextRequest): Promise<NextResponse> {
   ) {
     // 307 (NextResponse.redirect default). `/admin/login` is excluded so no loop.
     return NextResponse.redirect(new URL("/admin/login", request.url));
+  }
+
+  // Scorekeeper confinement (schedule overview §6.1): a user whose roles grant ONLY scoring
+  // is sent to /admin/scoring from ANY other admin path (incl. the page-ungated
+  // /admin/articles/new). Done here, at the HTTP level, because it then covers full loads,
+  // client-side (RSC) navigations and Server-Action redirects alike — a redirect thrown from
+  // the shared admin LAYOUT does not: layouts don't re-render on navigation (layout.md
+  // §"Pathname"), and one thrown mid-navigation left the router in a refetch loop. Not the
+  // only gate: each section's page / Server Actions still check roles, and RLS enforces at
+  // the row. Scoring paths skip the extra profile read (every scoring tap posts there).
+  // `/admin` itself is left to the dashboard PAGE's own redirect: the sign-in Server Action
+  // redirects there and Next renders that target through this proxy inside the action
+  // response — a proxy redirect at that point strands the client on a blank /admin, while a
+  // page-level redirect() is followed correctly.
+  if (user && pathname !== "/admin/login" && pathname !== "/admin" && !isScoringPath(pathname)) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("roles,status")
+      .eq("id", user.id)
+      .maybeSingle();
+    const profile = data as { roles: string[] | null; status: string } | null;
+    // Fail open on a read error: the page-level gates still apply.
+    if (!error && profile?.status === "active" && homeForRoles(profile.roles ?? []) === "/admin/scoring") {
+      const redirect = NextResponse.redirect(new URL("/admin/scoring", request.url));
+      // Carry any rotated auth cookies onto the redirect.
+      for (const c of response.cookies.getAll()) redirect.cookies.set(c);
+      return redirect;
+    }
   }
 
   return response;

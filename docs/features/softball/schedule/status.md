@@ -17,13 +17,19 @@
 ## Slice board
 | Slice | State | Notes |
 |---|---|---|
-| S1 Foundation | in progress | |
-| S2 i18n foundation | todo | |
-| S3 Public schedule | todo | |
-| S4 Scorekeeper | todo | |
+| S1 Foundation | ✅ `e453d10` | 0026 applied; Pan Am seeded (33 events, verified vs flyer) |
+| S2 i18n foundation | ✅ `a45ad9e` | /es rewrite, dictionaries, switcher, hreflang; canonical = usvisoftball.org |
+| S3 Public schedule | ✅ `44bd7ad` | list/cards, modal+drawer (intercepting route, works under /es), JSON-LD, OG, .ics, tournament + guest team pages |
+| S4 Scorekeeper | in progress | 0027 applied (scorekeeper column guard) |
 | S5 Timeline/calendar, sitemap, rest of Spanish, contract migration | todo | |
 
 ## Open questions (owner: human)
 - Opponent box scores (D6) — board decision.
 - Live stream URL for the Pan Am (flyer says "watch live at usvisoftball.org").
 - U18 roster (names, numbers, positions) — shows "Roster to be announced" until supplied.
+
+## Polish backlog (observed in S3 screenshots, 2026-11-15)
+- Desktop modal puts Line score/Roster ABOVE When & Where; mobile drawer has When & Where first. Make both follow spec order (header → when & where → stream → line score → box score → roster).
+- "UPCOMING" chip on every pregame row is visual noise — show chips only for Live / Final (+score) / Postponed / Cancelled.
+- OG share image shows only venue-local time (CST); add Atlantic time (USVI audience).
+- "CST" alone can read as US Central; consider "local" wording in the list legend.

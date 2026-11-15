@@ -31,3 +31,51 @@ of the removed items" is flag-aware (Teams/Events are expected when their flag i
 — satori renders emoji only from a CDN-fetched image set, and the image must render with no
 network dependency. Oswald is vendored as static TTF instances (`app/fonts/oswald-{bold,medium}.ttf`,
 generated from the vendored variable woff2; satori cannot read woff2).
+
+## 2026-11-15 — S4 Scorekeeper (`/admin/scoring`)
+
+**Shipped:** `/admin/scoring` lists every game, today's first (venue-local), then upcoming,
+then past games, with USVI games first within each day. `/admin/scoring/[slug]` is the
+phone-first game screen. It has Scoreboard, Lineup and Box score tabs (the last two only on USVI
+games), a sticky sync pill (Saved ✓ / Saving… / Offline — will sync) and an Undo button. Tap
+targets are at least 56px. The screen has Start, ‹ › inning buttons, ±1 run for the current
+inning, H/E steppers, a Final button with a confirm step, and Reopen for editors only. The Lineup
+tab is a "Who played?" checklist. The Box score tab opens a stat sheet with steppers; pitching
+innings are entered as outs and shown as IP. Impossible lines are refused with
+`validateStatLine`'s message. A non-blocking warning appears when USVI's scoreboard hits don't
+match the box-score hits.
+- Pure helpers: `lib/scoring-view.ts` (`createOpQueue`, `applyOp`, `orderScoringGames`, plus
+  `isZeroLine`, `zeroStatLine`, `scoringDayGroup`; `OpQueue` gains `list()`), `lib/roles-view.ts`
+  (`homeForRoles`, `isScoringPath`).
+- DAL `lib/scoring.ts` uses the cookie session client. Stat-line `team_id` is resolved server-side,
+  and every write is an absolute SET. Actions in `app/admin/(protected)/scoring/actions.ts` check
+  the role with `checkAnyRole` (new in `lib/roles.ts`, a version of `requireAnyRole` that does not
+  redirect) and return `{ok:false}` instead of redirecting. They validate UUIDs, integer bounds
+  (inning 1–30, counts 0–99, lineup ≤ 60) and `validateStatLine`. Only an editor may reopen a
+  Final game or change its runs, H or E. On success they revalidate `/events/[slug]` (page) and
+  `/events`.
+- Client `components/client/use-scoring-queue.ts`: an external store over the localStorage
+  OpQueue plus the confirmed base state. Ops are sent one at a time. A send that throws keeps the
+  op queued and retries on `online` and every 4s. A send the server refuses is dropped, its
+  message is shown, and the page refreshes from the server. Undo enqueues the inverse SET.
+- **Scorekeeper isolation is enforced in `proxy.ts`**, not in the layout. For any `/admin` path
+  outside `/admin/scoring/**` (except `/admin` and `/admin/login`), the proxy reads the profile
+  over RLS and sends a scorekeeper-only user to `/admin/scoring`. A redirect thrown from the
+  shared protected layout during a soft navigation left the client router refetching
+  `/admin/scoring` in an endless loop (seen in testing), and layouts can't read the pathname. The
+  proxy covers full loads, RSC navigations and Server-Action redirects. `/admin` relies on the
+  dashboard page's own `redirect()`, because a proxy redirect inside the sign-in action's
+  response left the client stuck on a blank `/admin`. The dashboard shows `admin-nav-scoring` to
+  scorekeepers and editors.
+- Gap-fix testids: public `boxscore-row[data-player-id]` with `boxscore-{ab,r,h,rbi,bb,so}`
+  (was `boxscore-line`), `linescore-inning[data-inning]`.
+- Specs strengthened (assertions only added): e2e-001 checks that a contributor has no
+  `admin-nav-scoring`; e2e-002 checks the public `linescore-inning` cells; e2e-005 checks
+  `lineup-error` and the public `boxscore-row` AB/H/RBI values; e2e-006 checks
+  `scoring-final-cancel`.
+
+**Known limitation (needs a migration to lift):** 0026 RLS lets only editors DELETE
+`game_player_stats`. A scorekeeper therefore cannot take a player off a lineup once it has been
+saved, even when that player's line is all zeros. The UI and the action refuse this with a
+plain-language hint and make no partial write. A follow-up migration could allow scorekeepers to
+delete all-zero lines.

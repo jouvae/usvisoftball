@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { readOwnProfile } from "@/lib/roles";
+import { homeForRoles } from "@/lib/roles-view";
 import { AI_DRAFT_ENABLED, TEAMS_ENABLED, EVENTS_ENABLED } from "@/lib/flags";
 
 // The minimal dashboard placeholder — the "admin data" marker. It only renders for
@@ -18,6 +20,13 @@ export default async function AdminDashboardPage() {
   const profile = await readOwnProfile(user.id);
   const roles = profile?.roles ?? [];
 
+  // A scorekeeper-only user's admin home is the scoring area (schedule §6.1). The protected
+  // layout already does this on a full request; repeating it here covers a soft navigation
+  // back to /admin, where the shared layout does not re-render.
+  if (profile?.status === "active" && homeForRoles(roles) === "/admin/scoring") {
+    redirect("/admin/scoring");
+  }
+
   // Role-aware nav (slice-06 §4.1). A CONTRIBUTOR authors drafts (New article + own
   // queue); an EDITOR reviews (the editorial review queue). The New-article link
   // stays contributor-only — createDraft requires `contributor`, so a New-article
@@ -28,7 +37,8 @@ export default async function AdminDashboardPage() {
   // `admin-roles` / `admin-authenticated` / `admin-dashboard` markers are preserved.
   const canAuthor = roles.includes("contributor");
   const canReview = roles.includes("editor");
-  const showNav = canAuthor || canReview;
+  const canScore = roles.includes("scorekeeper") || canReview;
+  const showNav = canAuthor || canReview || canScore;
 
   return (
     <section data-testid="admin-dashboard">
@@ -134,6 +144,17 @@ export default async function AdminDashboardPage() {
               className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
             >
               Home stats
+            </Link>
+          ) : null}
+          {/* Live scoring (schedule S4) is for scorekeeper OR editor; every scoring Server
+              Action re-checks the role and RLS + 0027 re-enforce at the row. */}
+          {canScore ? (
+            <Link
+              data-testid="admin-nav-scoring"
+              href="/admin/scoring"
+              className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+            >
+              Scoring
             </Link>
           ) : null}
           {/* The AI draft panel is for contributor OR editor (slice-09 §5.1), and

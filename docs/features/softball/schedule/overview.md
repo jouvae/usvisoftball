@@ -153,6 +153,57 @@ Phone-first. A `scorekeeper` sees only this area (editors see it too).
    Invalid combos (H > AB) are blocked inline with a plain-language hint.
 5. Consistency hint: if USVI hits on the scoreboard ≠ sum of box-score hits, show a non-blocking warning.
 
+### 6.1 S4 contract (pinned 2026-11-15 — tests and implementation both follow this)
+
+**Persistence model (idempotent, offline-safe).** The client never sends "+1". Every tap computes the
+NEW ABSOLUTE value locally and sends a *set* operation: `setInningRuns(gameId, inning, side, runs)`,
+`setTeamTotals(gameId, side, {hits, errors})`, `setGameState(gameId, state, currentInning)`,
+`setStatLine(gameId, playerId, line)`, `setLineup(gameId, playerIds[])`. Replaying a set twice is
+harmless, so the offline queue (localStorage, per game, FIFO, each op stamped with a client sequence
+number) can retry freely. Undo = push a set op restoring the previous value. All actions are Server
+Actions in `app/admin/(protected)/scoring/actions.ts` → `lib/scoring.ts` (server-only DAL, cookie
+session client, so RLS is the boundary) and validate input with `validateStatLine` etc. They return
+`{ ok: true } | { ok: false, error }` (plain-language error), never throw to the client.
+
+**Role.** `scorekeeper` (and `editor`) may use `/admin/scoring/**` (`requireAnyRole(['scorekeeper',
+'editor'])`). A scorekeeper visiting `/admin` is redirected to `/admin/scoring`; other admin sections
+redirect a scorekeeper back to `/admin/scoring` (they lack editor/contributor). Admin nav for a
+scorekeeper shows only "Scoring". A contributor without scorekeeper is redirected away from scoring.
+DB: migration `0027_scorekeeper_columns.sql` limits a scorekeeper's UPDATE on `games` to `state,
+current_inning, away_hits, away_errors, home_hits, home_errors, updated_at` (editors keep full update)
+— via a BEFORE UPDATE trigger that rejects changes to other columns unless `has_role(…,'editor')`.
+
+**Screens & testids.**
+- `/admin/scoring`: `scoring-games` list of `scoring-game-link` (`data-slug`), today (venue-local) first,
+  then upcoming, then recent finals; USVI games first within a day. Each shows TeamBadges + time + state.
+- `/admin/scoring/[slug]`: tabs `scoring-tab-scoreboard` (default) · `scoring-tab-lineup` (USVI games
+  only) · `scoring-tab-boxscore` (USVI games only). Persistent `scoring-sync-status` pill with
+  `data-state="saved|saving|offline"` and visible text ("Saved ✓" / "Saving…" / "Offline — will sync").
+  `scoring-undo` (disabled when nothing to undo).
+- Scoreboard: `scoring-state` (Pregame/Live/Final), `scoring-start` (pregame→live, inning 1),
+  `scoring-inning` (shows the current inning number), `scoring-next-inning`, `scoring-prev-inning`;
+  per side `scoring-run-plus-{away|home}` / `scoring-run-minus-{away|home}` (current inning),
+  `scoring-hits-plus-…`/`-minus-…`, `scoring-errors-plus-…`/`-minus-…`, value readouts
+  `scoring-runs-{side}` (game total), `scoring-hits-{side}`, `scoring-errors-{side}`; the shared
+  `LineScore` component in its editable-aware variant shows all innings. `scoring-final` opens a confirm
+  `scoring-final-confirm`. A final game shows `scoring-reopen` (editor only).
+- Lineup: `lineup-player` checkboxes (`data-player-id`) for the USVI side's ACTIVE roster, pre-checked
+  when the game has no lines yet; `lineup-save`. Saving creates zero-lines for checked players (never
+  deletes a line that has non-zero stats; unchecking such a player is blocked with a hint).
+- Box score: rows `boxscore-edit-player` (`data-player-id`) → the shared ResponsiveSheet `stat-sheet`
+  with steppers `stat-{field}-plus` / `stat-{field}-minus` and readout `stat-{field}-value` for
+  `ab r h doubles triples hr rbi bb so sb`; `stat-pitching-toggle` reveals `outs p_h p_r p_er p_bb p_so`
+  (outs readout shows IP via formatInningsPitched). An invalid tap (e.g. H above AB) is refused and
+  `stat-error` shows the plain-language reason. Each tap autosaves through the same queue.
+- `scoring-hits-mismatch` warning (on the Scoreboard tab) when USVI scoreboard hits ≠ sum of box-score H.
+- Gap fixes (from the S4 test pass): public `boxscore` rows are `boxscore-row` (`data-player-id`) with
+  cells `boxscore-{ab|r|h|rbi|bb|so}`; line-score inning cells are `linescore-inning` (`data-inning`).
+  `scoring-final-confirm` is the confirm BUTTON inside the confirm dialog; `scoring-final-cancel`
+  cancels. The lineup refusal hint is `lineup-error`. The admin nav link is `admin-nav-scoring`.
+- **Scorekeeper isolation:** the protected admin layout sends a user whose roles are scorekeeper-only to
+  `/admin/scoring` for ANY admin path outside `/admin/scoring/**` (closes the ungated
+  `/admin/articles/new` gap for this role).
+
 ## 7. Priority order (build top-down; stop wherever time runs out)
 
 1. **S1 Foundation** — Vitest; migration 0026; `lib/schedule-view.ts` + `lib/schedule.ts`; seed script + load.

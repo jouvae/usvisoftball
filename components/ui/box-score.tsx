@@ -95,12 +95,17 @@ export function BoxScore({
             </thead>
             <tbody>
               {lines.map((l) => (
-                <tr key={l.id} data-testid="boxscore-line" className="border-t border-border">
+                <tr
+                  key={l.id}
+                  data-testid="boxscore-row"
+                  data-player-id={l.playerId}
+                  className="border-t border-border"
+                >
                   <th scope="row" className={`${td} text-left font-normal`}>
                     {name(l)}
                   </th>
                   {BATTING.map((c) => (
-                    <td key={c.key} className={`${td} text-center`}>
+                    <td key={c.key} data-testid={`boxscore-${c.key}`} className={`${td} text-center`}>
                       {renderCell({ line: l, field: c.key, value: l[c.key] })}
                     </td>
                   ))}

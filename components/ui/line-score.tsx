@@ -109,7 +109,12 @@ export function LineScore({
                       </span>
                     </th>
                     {innings.map((n) => (
-                      <td key={n} className="py-2 text-foreground">
+                      <td
+                        key={n}
+                        data-testid="linescore-inning"
+                        data-inning={n}
+                        className="py-2 text-foreground"
+                      >
                         {renderCell({
                           side,
                           inning: n,
