@@ -441,3 +441,120 @@ export function isUsviTeam(team: Pick<ScheduleTeam, "countryCode">): boolean {
 export function isUsviGame(game: Pick<GameWithTeams, "away" | "home"> | null): boolean {
   return game != null && (isUsviTeam(game.away) || isUsviTeam(game.home));
 }
+
+// ── S3 public schedule helpers (pure) ────────────────────────────────────────────
+
+// One venue's events within a day (flyer: gold venue label, rows in start order).
+export interface VenueGroup<E extends EventWithGame = EventWithGame> {
+  venue: string;
+  events: E[];
+}
+
+// One venue-local calendar day (flyer: navy day bar) and its venue groups.
+export interface DayGroup<E extends EventWithGame = EventWithGame> {
+  date: string; // 'YYYY-MM-DD', venue-local
+  firstStartsAt: string; // ISO — what the day heading is formatted from
+  timezone: string; // the zone `date` was computed in (the first event's)
+  venues: VenueGroup<E>[];
+}
+
+// Events grouped day → venue, like the flyer. Days are keyed by VENUE-LOCAL date (each event's
+// tournament timezone), ascending. Within a day, venues are ordered by their earliest start and
+// rows by (startsAt, sortOrder). A day is `past` once its venue-local date is before today's
+// venue-local date at `now`; past days keep ascending order (the caller renders them below).
+export function groupEventsByDay<E extends EventWithGame>(
+  events: readonly E[],
+  now: Date,
+): { upcoming: DayGroup<E>[]; past: DayGroup<E>[] } {
+  const sorted = [...events].sort(
+    (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.sortOrder - b.sortOrder,
+  );
+  const days = new Map<string, DayGroup<E>>();
+  for (const e of sorted) {
+    const date = localDateKey(e.startsAt, e.timezone);
+    let day = days.get(date);
+    if (!day) {
+      day = { date, firstStartsAt: e.startsAt, timezone: e.timezone, venues: [] };
+      days.set(date, day);
+    }
+    // `sorted` is in start order, so the first event seen per venue is its earliest start and
+    // venues are appended in earliest-start order.
+    let venue = day.venues.find((v) => v.venue === e.venue);
+    if (!venue) {
+      venue = { venue: e.venue, events: [] };
+      day.venues.push(venue);
+    }
+    venue.events.push(e);
+  }
+  const all = [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const upcoming: DayGroup<E>[] = [];
+  const past: DayGroup<E>[] = [];
+  for (const day of all) {
+    (day.date < localDateKey(now.toISOString(), day.timezone) ? past : upcoming).push(day);
+  }
+  return { upcoming, past };
+}
+
+// Short date of an instant in a zone (en "Nov 21, 2026", es "21 nov 2026").
+export function formatShortDate(iso: string, timeZone: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone,
+  }).format(new Date(iso));
+}
+
+// A tournament window as a localized range in the tournament's zone (en "Mar 14 – 15, 2099").
+// 'announced' windows are plain dates, formatted as UTC calendar dates so they never shift.
+export function formatTournamentWindow(
+  window: TournamentWindow,
+  timeZone: string,
+  locale: Locale,
+): string {
+  const zone = window.source === "announced" ? "UTC" : timeZone;
+  const toDate = (v: string) => new Date(window.source === "announced" ? `${v}T12:00:00Z` : v);
+  const fmt = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: zone,
+  });
+  return fmt.formatRange(toDate(window.start), toDate(window.end));
+}
+
+// The ISO 8601 timestamp of an instant expressed in a zone's local time with its UTC offset
+// (2099-03-15T15:00:00Z in America/El_Salvador → "2099-03-15T09:00:00-06:00").
+export function isoWithOffset(iso: string, timeZone: string): string {
+  const date = new Date(iso);
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  );
+  // longOffset is "GMT-06:00"; UTC comes out as "GMT" or "GMT+00:00" depending on ICU → "Z".
+  const raw = parts.timeZoneName.replace("GMT", "");
+  const offset = raw === "" || raw === "+00:00" || raw === "-00:00" ? "Z" : raw;
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;
+}
+
+// A Google Maps search link for a venue (plus its city/country, when known).
+export function googleMapsUrl(venue: string, place = ""): string {
+  const query = [venue, place].filter(Boolean).join(", ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+// True when any event in the list is a game currently in progress (drives live refresh).
+export function hasLiveGame(events: readonly Pick<EventWithGame, "game">[]): boolean {
+  return events.some((e) => e.game?.state === "live");
+}

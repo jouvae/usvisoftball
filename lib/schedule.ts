@@ -5,6 +5,7 @@ import { PLAYER_COLUMNS, toPlayer, type PlayerRow } from "@/lib/teams";
 import {
   ATLANTIC_TZ,
   isUsviTeam,
+  tournamentWindow,
   type EventDetail,
   type EventStatus,
   type EventType,
@@ -16,6 +17,7 @@ import {
   type ScheduleTeam,
   type Side,
   type Tournament,
+  type TournamentWindow,
 } from "@/lib/schedule-view";
 import type { TeamKind, TeamPlayer } from "@/lib/teams-view";
 
@@ -417,4 +419,55 @@ export async function listGamesForTeam(
     .limit(LIST_LIMIT);
   if (error) throw error;
   return ((data as unknown as EventRow[] | null) ?? []).map(toEventWithGame);
+}
+
+// The next tournament for the home "Upcoming Event" band: the tournament of the earliest event
+// that has not ended yet (window derived from ALL its events, D2); failing that, the soonest
+// tournament with announced dates still ahead and no events yet. null → no band.
+export async function getNextTournament(
+  now: Date,
+  supabase: SupabaseClient = createPublicClient(),
+): Promise<{ tournament: Tournament; window: TournamentWindow | null } | null> {
+  const from = now.toISOString();
+  const next = await supabase
+    .from("calendar_events")
+    .select("tournament_id")
+    .not("tournament_id", "is", null)
+    .or(`ends_at.gte."${from}",and(ends_at.is.null,starts_at.gte."${from}")`)
+    .order("starts_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (next.error) throw next.error;
+
+  let tournamentId = (next.data as { tournament_id: string } | null)?.tournament_id ?? null;
+  if (!tournamentId) {
+    const today = from.slice(0, 10);
+    const announced = await supabase
+      .from("tournaments")
+      .select("id,calendar_events(id)")
+      .gte("announced_end", today)
+      .order("announced_start", { ascending: true })
+      .limit(20);
+    if (announced.error) throw announced.error;
+    const rows = (announced.data as { id: string; calendar_events: { id: string }[] | null }[] | null) ?? [];
+    tournamentId = rows.find((r) => (r.calendar_events ?? []).length === 0)?.id ?? null;
+  }
+  if (!tournamentId) return null;
+
+  const [tRes, eRes] = await Promise.all([
+    supabase.from("tournaments").select(TOURNAMENT_COLUMNS).eq("id", tournamentId).maybeSingle(),
+    supabase
+      .from("calendar_events")
+      .select("starts_at,ends_at")
+      .eq("tournament_id", tournamentId)
+      .limit(LIST_LIMIT),
+  ]);
+  if (tRes.error) throw tRes.error;
+  if (eRes.error) throw eRes.error;
+  if (!tRes.data) return null;
+  const tournament = toTournament(tRes.data as TournamentRow);
+  const spans = ((eRes.data as { starts_at: string; ends_at: string | null }[] | null) ?? []).map(
+    (r) => ({ startsAt: r.starts_at, endsAt: r.ends_at }),
+  );
+  return { tournament, window: tournamentWindow(spans, tournament) };
 }

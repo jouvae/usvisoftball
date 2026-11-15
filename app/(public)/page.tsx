@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { listHomeNews } from "@/lib/articles";
 import { listPublishedStats } from "@/lib/stats";
 import { listTeams } from "@/lib/teams";
-import { getNextEvent, todayISO } from "@/lib/events";
-import { alternatesFor } from "@/lib/i18n/server";
+import { countryName, formatTournamentWindow, getNextTournament } from "@/lib/schedule";
+import { alternatesFor, getLocale } from "@/lib/i18n/server";
+import { localizePath } from "@/lib/i18n/locale";
 import { EVENTS_ENABLED, TEAMS_ENABLED } from "@/lib/flags";
 import { ArticleCard } from "@/components/ui/article-card";
 import { GetInvolvedSection } from "@/components/ui/get-involved";
-import { HomeEventBand } from "@/components/ui/home-event";
+import { HomeEventBand, type HomeEventBandData } from "@/components/ui/home-event";
 import { HomeHero } from "@/components/ui/home-hero";
 import { HomeTeamsSection } from "@/components/ui/home-teams";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -29,12 +30,31 @@ export async function generateMetadata(): Promise<Metadata> {
 // flags are off (their routes 404). All data loads in one Promise.all (no waterfall). The
 // board roster lives on /about.
 export default async function Home() {
-  const [news, stats, nationalTeams, nextEvent] = await Promise.all([
+  const [news, stats, nationalTeams, next, locale] = await Promise.all([
     listHomeNews(3),
     listPublishedStats(3),
     TEAMS_ENABLED ? listTeams(undefined, { kind: "national" }) : Promise.resolve([]),
-    EVENTS_ENABLED ? getNextEvent(todayISO(new Date())) : Promise.resolve(null),
+    EVENTS_ENABLED ? getNextTournament(new Date()) : Promise.resolve(null),
+    getLocale(),
   ]);
+  // The band features the next tournament (schedule S3), its window derived from its events.
+  const nextEvent: HomeEventBandData | null = next
+    ? {
+        name: locale === "es" && next.tournament.nameEs ? next.tournament.nameEs : next.tournament.name,
+        href: localizePath(locale, `/tournaments/${next.tournament.slug}`),
+        dates: next.window
+          ? formatTournamentWindow(next.window, next.tournament.timezone, locale)
+          : "",
+        dateTime: next.window?.start,
+        venue: [
+          next.tournament.city,
+          next.tournament.countryCode ? countryName(next.tournament.countryCode, locale) : "",
+        ]
+          .filter(Boolean)
+          .join(", "),
+        coverImageUrl: next.tournament.coverImageUrl,
+      }
+    : null;
 
   return (
     <div className="flex flex-1 flex-col">

@@ -45,13 +45,18 @@ const PRESENT = [
   "nav-link-shop",
   "nav-link-donate",
 ];
-// Teams/Events are flag-gated (NEXT_PUBLIC_TEAMS_ENABLED / _EVENTS_ENABLED); .env.local leaves
-// them off, so they are absent here. nav-link-news never returns: "News" is the label of
-// nav-link-articles (route /articles).
+// nav-link-news never returns: "News" is the label of nav-link-articles (route /articles).
+// Teams/Events are flag-gated (NEXT_PUBLIC_TEAMS_ENABLED / _EVENTS_ENABLED; production has both
+// ON): present when their flag is on, absent when off.
+const TEAMS_ON = process.env.NEXT_PUBLIC_TEAMS_ENABLED === "true";
+const EVENTS_ON = process.env.NEXT_PUBLIC_EVENTS_ENABLED === "true";
+const FLAGGED = [
+  { testId: "nav-link-teams", on: TEAMS_ON },
+  { testId: "nav-link-events", on: EVENTS_ON },
+];
 const REMOVED = [
   "nav-link-news",
-  "nav-link-teams",
-  "nav-link-events",
+  ...FLAGGED.filter((f) => !f.on).map((f) => f.testId),
 ];
 
 // ---------------------------------------------------------------------------
@@ -62,10 +67,10 @@ test.describe("shell-mvp — primary nav", () => {
     await page.goto("/");
   });
 
-  test("shows News · Get Involved · Shop · About · Support and none of the removed items", async ({
+  test("shows News · Get Involved · Shop · About · Support (+ flag-on Teams/Events) and none of the removed items", async ({
     page,
   }) => {
-    for (const testId of PRESENT) {
+    for (const testId of [...PRESENT, ...FLAGGED.filter((f) => f.on).map((f) => f.testId)]) {
       await expect(page.getByTestId(testId)).toHaveCount(1);
     }
     for (const testId of REMOVED) {

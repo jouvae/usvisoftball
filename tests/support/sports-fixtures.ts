@@ -173,13 +173,21 @@ export const FX_TEAM_COUNT = Object.keys(FX_TEAMS).length; // 5
 export const FX_PLAYER_COUNT = FX_PLAYERS.length; // 17
 export const FX_EVENT_COUNT = Object.keys(FX_EVENTS).length; // 3
 
-// Delete every fixture row (by the e2e- slug prefix). Cascades remove their team_players
+// Delete every fixture row (by its exact slug). Cascades remove their team_players
 // and event_teams. Never touches a row without the prefix.
 export async function cleanupSportsFixtures(): Promise<void> {
   const db = createAdminClient();
-  const ev = await db.from("events").delete().like("slug", `${FX_PREFIX}%`);
+  // Exact fixture slugs only — never the `e2e-` prefix, which other suites' fixtures share
+  // (e.g. the schedule fixtures' guest teams, whose games restrict deletes).
+  const ev = await db
+    .from("events")
+    .delete()
+    .in("slug", Object.values(FX_EVENTS).map((e) => e.slug));
   if (ev.error) throw ev.error;
-  const tm = await db.from("teams").delete().like("slug", `${FX_PREFIX}%`);
+  const tm = await db
+    .from("teams")
+    .delete()
+    .in("slug", Object.values(FX_TEAMS).map((t) => t.slug));
   if (tm.error) throw tm.error;
 }
 

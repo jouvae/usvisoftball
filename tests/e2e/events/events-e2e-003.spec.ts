@@ -1,7 +1,7 @@
 /*
 ---
 id: events-e2e-003
-name: "events-e2e-003: Events admin CRUD w/ logo; upload lifecycle, date-grouping, reap, authz + RLS"
+name: "events-e2e-003: Events admin CRUD w/ logo; upload lifecycle, reap, authz + RLS"
 feature: softball/events
 stack: web
 priority: P1
@@ -13,8 +13,6 @@ references:
   - components/client/event-delete-button.tsx (event-delete)
   - lib/events.ts (createEvent/updateEvent/deleteEvent; slug stable; getEventLogoUrl)
   - lib/board-photos.ts (uploadBoardPhoto: declared-type + magic-byte validation; reap by URL)
-  - components/ui/events-directory.tsx (public /events: events-upcoming/-past, event-card, event-name link)
-  - app/(public)/events/[slug]/page.tsx (event-detail + event-detail-logo)
   - supabase/migrations/0017_events.sql (events; public-read)
   - supabase/migrations/0018_events_admin.sql (editor-only events write RLS)
   - supabase/migrations/0009_board_photos_storage.sql (board-photos bucket, editor-only write)
@@ -24,15 +22,17 @@ The events admin-CRUD slice, all writes through the real editor session (0018 RL
 
 (a) An EDITOR creates an event (marker name, island "" = territory-wide, start 2098-05-01 /
     end 2098-05-05, uploaded PNG logo). It persists (service read: island IS NULL,
-    start_date 2098-05-01, logo_url is a board-photos URL, object EXISTS via LIST api), renders
-    on /events in the events-upcoming group, and its /events/[slug] detail shows an
-    event-detail-logo img.
+    start_date 2098-05-01, logo_url is a board-photos URL, object EXISTS via LIST api).
 (b) Editing the event (venue + move dates to 2019-05-01/2019-05-05) persists (service read) and
-    the slug stays STABLE; the event now lands in the events-past group (date-driven grouping).
+    the slug stays STABLE.
 (c) A magic-byte-SPOOFED logo upload is rejected with event-add-error, creates NO event, and —
     validation runs BEFORE upload — leaves NO new Storage object.
-(d) Deleting an event removes it from /events and reaps its logo Storage object (GONE via the
+(d) Deleting an event removes its row and reaps its logo Storage object (GONE via the
     LIST api); every non-marker event remains.
+
+RETIRED 2026-11-15 (schedule S3): the PUBLIC assertions (legacy `events` rows rendering on
+/events and /events/[slug]) were removed — those routes now render the schedule's
+calendar_events (schedule-web-010…020). This spec keeps the legacy admin CRUD contract only.
 (e) A CONTRIBUTOR is redirected /admin/events → /admin; ANON → /admin/login; a direct PostgREST
     INSERT/UPDATE/DELETE on `events` with the contributor JWT / anon key is denied (RLS/grant).
 
@@ -292,7 +292,7 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
     }
   });
 
-  test("(a+b) editor creates a territory-wide upcoming event w/ PNG logo → persists + object + renders + detail-logo; edit moves it to Past, slug stable", async ({
+  test("(a+b) editor creates a territory-wide event w/ PNG logo → persists + object; edit persists, slug stable", async ({
     page,
   }) => {
     const name = `${MARKER_PREFIX} A ${randomUUID()}`;
@@ -313,18 +313,6 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
     // …whose Storage object actually EXISTS (LIST api, not the cached public URL).
     expect(await objectExists(logoKey!), "uploaded logo object exists").toBe(true);
 
-    // …and it renders on /events in the UPCOMING group…
-    await page.goto("/events");
-    const upcomingCard = page
-      .getByTestId("events-upcoming")
-      .locator('[data-testid="event-card"]', { hasText: name });
-    await expect(upcomingCard).toBeVisible();
-
-    // …and its detail page shows a rendered event-detail-logo img.
-    await page.goto(`/events/${created.slug}`);
-    await expect(page.getByTestId("event-detail")).toBeVisible();
-    await expect(page.getByTestId("event-detail-logo")).toBeVisible();
-
     // WHEN (b): the editor edits venue + moves the dates into the past.
     await page.goto("/admin/events");
     const item = page.locator('[data-testid="event-admin-item"]', { hasText: name });
@@ -343,17 +331,6 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
     const after = (await readMarkerEvents()).find((e) => e.name === name);
     expect(after!.venue, "venue change persisted").toBe("Lionel Roberts Stadium");
     expect(after!.slug, "slug is stable across an edit").toBe(created.slug);
-
-    // …and the event now lands in the PAST group on /events (date-driven grouping).
-    await page.goto("/events");
-    await expect(
-      page.getByTestId("events-past").locator('[data-testid="event-card"]', { hasText: name }),
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId("events-upcoming")
-        .locator('[data-testid="event-card"]', { hasText: name }),
-    ).toHaveCount(0);
   });
 
   test("(c) a magic-byte-spoofed logo upload is rejected: event-add-error, no event, no object", async ({
@@ -386,7 +363,7 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
     ).toBe(false);
   });
 
-  test("(d) deleting an event removes it from /events and reaps its logo object; other events remain", async ({
+  test("(d) deleting an event removes its row and reaps its logo object; other events remain", async ({
     page,
   }) => {
     const name = `${MARKER_PREFIX} D ${randomUUID()}`;
@@ -408,13 +385,7 @@ test.describe("events-e2e-003 — events admin CRUD w/ logo + date-grouping + re
     await item.getByTestId("event-delete").click();
     await expect(item).toHaveCount(0);
 
-    // THEN: gone from the public directory…
-    await page.goto("/events");
-    await expect(
-      page.locator('[data-testid="event-card"]', { hasText: name }),
-    ).toHaveCount(0);
-
-    // …the event row is gone…
+    // THEN: the event row is gone…
     await expect
       .poll(async () => (await readMarkerEvents()).some((e) => e.name === name), {
         timeout: 10_000,

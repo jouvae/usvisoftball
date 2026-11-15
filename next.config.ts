@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   // Fly.io deploy shape. Combined with self-hosted fonts, the build needs no
   // network access.
   output: "standalone",
+  // The event OG image (app/(public)/events/[slug]/opengraph-image.tsx) reads the vendored
+  // Oswald TTFs from disk at request time; make sure the standalone trace ships them.
+  outputFileTracingIncludes: {
+    "/events/**": ["./app/fonts/oswald-*.ttf"],
+  },
   // The news section became the article-first home + /articles. Keep old links working.
   async redirects() {
     return [

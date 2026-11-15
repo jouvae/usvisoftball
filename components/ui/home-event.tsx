@@ -5,17 +5,26 @@ import { buttonVariants } from "@/components/ui/button";
 import { AccentRule } from "@/components/ui/motifs/accent-rule";
 import { StripeEdge } from "@/components/ui/motifs/stripe-edge";
 import { safeStoredImageHref } from "@/lib/safe-image-url";
-import { formatEventDateRange, type FederationEvent } from "@/lib/events-view";
+
+// What the band shows — the next tournament (schedule S3), already localized by the caller.
+export interface HomeEventBandData {
+  name: string;
+  href: string; // e.g. /tournaments/{slug}
+  dates: string; // formatted window; '' → omitted
+  dateTime?: string; // machine-readable start for <time>
+  venue: string; // city, country; '' → omitted
+  coverImageUrl: string;
+}
 
 // The home "Upcoming Event" band (design guide §2.4): one full-bleed navy band for the next
-// event — eyebrow, name, date + venue rows, and a gold "Event details" button. With a cover
+// tournament — eyebrow, name, date + place rows, and a gold "Event details" button. With a cover
 // photo it fills the right ~45% on lg (masked into the navy) and sits on top at 16:9 on
 // mobile; without one the band is navy + the stripe edge only. The caller omits the band
 // when nothing is upcoming. Never render travel itineraries here (safeguarding — the
 // description is not shown on the band).
-export function HomeEventBand({ event }: { event: FederationEvent }) {
+export function HomeEventBand({ event }: { event: HomeEventBandData }) {
   const cover = safeStoredImageHref(event.coverImageUrl);
-  const dates = formatEventDateRange(event.startDate, event.endDate);
+  const dates = event.dates;
 
   return (
     <section
@@ -56,7 +65,7 @@ export function HomeEventBand({ event }: { event: FederationEvent }) {
             <li className="flex items-center gap-3">
               <CalendarDays aria-hidden="true" className="size-5 shrink-0 text-accent" />
               <span className="sr-only">Dates: </span>
-              <time data-testid="home-event-dates" dateTime={event.startDate ?? undefined}>
+              <time data-testid="home-event-dates" dateTime={event.dateTime}>
                 {dates}
               </time>
             </li>
@@ -70,7 +79,7 @@ export function HomeEventBand({ event }: { event: FederationEvent }) {
           ) : null}
         </ul>
         <Link
-          href={`/events/${event.slug}`}
+          href={event.href}
           data-testid="home-event-link"
           className={`${buttonVariants({ variant: "accent", size: "cta" })} mt-2 w-fit`}
         >
