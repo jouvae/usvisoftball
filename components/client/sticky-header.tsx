@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { stripLocale } from "@/lib/i18n/locale";
 
 // The sticky frosty masthead shell. It is a client component only to expose two bits of
 // state as data attributes the (server-rendered) children style against via `group/header`:
@@ -16,7 +17,7 @@ export function StickyHeader({
   children: ReactNode;
   className?: string;
 }) {
-  const pathname = usePathname();
+  const pathname = stripLocale(usePathname()); // /es is home too
   const [atTop, setAtTop] = useState(true);
 
   useEffect(() => {

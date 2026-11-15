@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { listEvents, splitEventsByDate, todayISO } from "@/lib/events";
 import { EventsDirectory } from "@/components/ui/events-directory";
+import { alternatesFor } from "@/lib/i18n/server";
 import { EVENTS_ENABLED } from "@/lib/flags";
 
 // DELIVER (events-web-001): the public events directory, from the REAL Supabase read via
@@ -8,6 +10,11 @@ import { EVENTS_ENABLED } from "@/lib/flags";
 // the current date. force-dynamic: reads Supabase AND uses the request-time date (a build
 // snapshot would go stale). Server Component; roots at <section>s.
 export const dynamic = "force-dynamic";
+
+// Localized page (served at /events and /es/events): hreflang alternates en / es / x-default.
+export async function generateMetadata(): Promise<Metadata> {
+  return { alternates: await alternatesFor("/events") };
+}
 
 export default async function EventsPage() {
   if (!EVENTS_ENABLED) notFound(); // dormant for MVP launch

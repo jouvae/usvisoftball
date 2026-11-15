@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { listHomeNews } from "@/lib/articles";
 import { listPublishedStats } from "@/lib/stats";
 import { listTeams } from "@/lib/teams";
 import { getNextEvent, todayISO } from "@/lib/events";
+import { alternatesFor } from "@/lib/i18n/server";
 import { EVENTS_ENABLED, TEAMS_ENABLED } from "@/lib/flags";
 import { ArticleCard } from "@/components/ui/article-card";
 import { GetInvolvedSection } from "@/components/ui/get-involved";
@@ -15,6 +17,11 @@ import { StatsStrip } from "@/components/ui/stats-strip";
 // supabase-js (NOT `fetch`), so force per-request rendering — every section must reflect an
 // editor's change immediately (and "next event" depends on today's date).
 export const dynamic = "force-dynamic";
+
+// Localized page (served at / and /es): hreflang alternates en / es / x-default.
+export async function generateMetadata(): Promise<Metadata> {
+  return { alternates: await alternatesFor("/") };
+}
 
 // Server Component. Home layout (docs/features/softball/home-layout/design-guide.md), built
 // as: hero → stats → Our Teams → Upcoming Event → Latest News → Get Involved. Every data

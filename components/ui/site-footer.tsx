@@ -12,25 +12,33 @@ import { AccentRule } from "@/components/ui/motifs/accent-rule";
 import { FooterSwoosh } from "@/components/ui/motifs/footer-swoosh";
 import { IslandSilhouettes } from "@/components/ui/motifs/island-silhouettes";
 import { FacebookIcon, InstagramIcon } from "@/components/ui/social-icons";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { localizePath } from "@/lib/i18n/locale";
 
 // Navy footer (home-layout design guide §3.2): swoosh edge → crest · Contact · Explore ·
 // Follow → tagline row → copyright. Server Component — contact details and socials come from
 // the contact_info singleton (socials guarded at render by safeSocialHref: https + host
-// allowlist); any empty field is omitted. Mounted once in the public layout.
+// allowlist); any empty field is omitted. Mounted once in the public layout. Labels come from
+// the request locale's dictionary and internal hrefs are localized (/es…).
 
 export async function SiteFooter({ className = "" }: { className?: string }) {
   const year = new Date().getFullYear();
-  const contact = await getContactInfo().catch(() => null);
+  const [contact, locale] = await Promise.all([
+    getContactInfo().catch(() => null),
+    getLocale(),
+  ]);
+  const t = getDictionary(locale);
 
   // Mirrors the primary nav (same flags), so the footer doubles as a sitemap.
   const links = [
-    ...(TEAMS_ENABLED ? [{ name: "Teams", href: "/teams" }] : []),
-    ...(EVENTS_ENABLED ? [{ name: "Events", href: "/events" }] : []),
-    { name: "News", href: "/articles" },
-    { name: "Get Involved", href: "/get-involved" },
-    ...(SHOP_ENABLED ? [{ name: "Shop", href: "/shop" }] : []),
-    { name: "About", href: "/about" },
-  ];
+    ...(TEAMS_ENABLED ? [{ name: t.nav.teams, href: "/teams" }] : []),
+    ...(EVENTS_ENABLED ? [{ name: t.nav.events, href: "/events" }] : []),
+    { name: t.nav.news, href: "/articles" },
+    { name: t.nav.involved, href: "/get-involved" },
+    ...(SHOP_ENABLED ? [{ name: t.nav.shop, href: "/shop" }] : []),
+    { name: t.nav.about, href: "/about" },
+  ].map((link) => ({ ...link, href: localizePath(locale, link.href) }));
 
   const socials = [
     {
@@ -58,10 +66,10 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
 
         <div className="relative mx-auto grid max-w-6xl gap-10 px-4 pt-10 pb-12 sm:px-6 sm:grid-cols-2 lg:grid-cols-[auto_1fr_1fr_1fr] lg:gap-12">
           <Link
-            href="/"
+            href={localizePath(locale, "/")}
             className="w-fit rounded-lg sm:col-span-2 lg:col-span-1 outline-accent focus:outline-2 focus:outline-offset-4"
           >
-            <span className="sr-only">USVI Softball Federation — home</span>
+            <span className="sr-only">{t.footer.homeLabel}</span>
             <Image
               src="/brand/crest.png"
               alt=""
@@ -73,7 +81,7 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
 
           {contact && (contact.email || contact.address || contact.phone) ? (
             <div data-testid="footer-contact" className="flex flex-col gap-4">
-              <h2 className={eyebrowClass}>Contact</h2>
+              <h2 className={eyebrowClass}>{t.footer.contact}</h2>
               <ul className="flex flex-col gap-3 text-sm">
                 {contact.email ? (
                   <li className="flex items-start gap-3">
@@ -104,8 +112,8 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
             </div>
           ) : null}
 
-          <nav aria-label="Footer" className="flex flex-col gap-4">
-            <h2 className={eyebrowClass}>Explore</h2>
+          <nav aria-label={t.footer.navLabel} className="flex flex-col gap-4">
+            <h2 className={eyebrowClass}>{t.footer.explore}</h2>
             <ul className="flex flex-col gap-2 text-sm">
               {links.map((item) => (
                 <li key={item.href}>
@@ -121,8 +129,8 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
                   rel="noopener noreferrer"
                   className={linkClass}
                 >
-                  Support the Federation
-                  <span className="sr-only"> (opens PayPal)</span>
+                  {t.nav.donate}
+                  <span className="sr-only"> {t.footer.opensPaypal}</span>
                 </a>
               </li>
             </ul>
@@ -130,7 +138,7 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
 
           {socials.length > 0 ? (
             <div className="flex flex-col gap-4">
-              <h2 className={eyebrowClass}>Follow</h2>
+              <h2 className={eyebrowClass}>{t.footer.follow}</h2>
               <ul className="flex flex-col gap-3 text-sm">
                 {socials.map(({ name, href, Icon }) => (
                   <li key={name}>
@@ -153,14 +161,13 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
         <div className="relative mx-auto flex max-w-6xl flex-col gap-3 px-4 pb-10 sm:px-6">
           <AccentRule />
           <p className="font-display text-2xl font-medium tracking-wide text-navy-foreground sm:text-3xl">
-            From the Virgin Islands to the World.
+            {t.footer.tagline}
           </p>
         </div>
 
         <div className="relative border-t border-white/10">
           <p className="mx-auto max-w-6xl px-4 py-6 text-sm sm:px-6">
-            &copy; {year} U.S. Virgin Islands Softball Federation. All rights
-            reserved.
+            &copy; {year} {t.footer.rights}
           </p>
         </div>
       </div>
