@@ -118,6 +118,29 @@ export async function requireEditorialRole(): Promise<{
   return redirect("/admin");
 }
 
+// The any-of role choke point (schedule S4, overview §6.1). Mirrors requireRole but passes
+// when the caller holds AT LEAST ONE of `roles` — e.g. the scoring area calls
+// requireAnyRole(['scorekeeper', 'editor']). requireUser() redirects an anon request; a
+// missing/disabled profile or one holding none of `roles` redirects to /admin (which in
+// turn sends a scorekeeper-only user to /admin/scoring via homeForRoles). An empty `roles`
+// list never passes. RLS + the 0027 triggers re-enforce at the row.
+export async function requireAnyRole(
+  roles: readonly string[],
+): Promise<{ user: User; profile: Profile }> {
+  const { requireUser } = await import("@/lib/auth");
+  const { redirect } = await import("next/navigation");
+  const user = await requireUser();
+  const profile = await readOwnProfile(user.id);
+  if (
+    profile != null &&
+    profile.status === "active" &&
+    roles.some((r) => profile.roles.includes(r))
+  ) {
+    return { user, profile };
+  }
+  return redirect("/admin");
+}
+
 // UPSERTs the `public.profiles` row through the service client (RLS-bypassing) — a
 // DEFINED seed write path, NOT an RLS bypass of someone else's data (same posture
 // as createArticle's seed use of the admin client). It MUST upsert, not bare
@@ -147,4 +170,30 @@ export async function assignRoles({
     .upsert(row, { onConflict: "id" });
 
   if (error) throw error;
+}
+
+// The NON-redirecting twin of requireAnyRole, for Server Actions called programmatically
+// (schedule S4 scoring queue). A redirect thrown from such an action would navigate the
+// scorekeeper away mid-game; instead the action gets `null` and returns a plain-language
+// { ok: false }. Same checks: a verified user (getUser re-validates the JWT), an ACTIVE
+// profile read through the RLS session client, holding at least one of `roles`. Returns
+// null for anon, missing/disabled profile, or no matching role. DB errors THROW.
+export async function checkAnyRole(
+  roles: readonly string[],
+): Promise<{ user: User; profile: Profile } | null> {
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const profile = await readOwnProfile(user.id);
+  if (
+    profile != null &&
+    profile.status === "active" &&
+    roles.some((r) => profile.roles.includes(r))
+  ) {
+    return { user, profile };
+  }
+  return null;
 }

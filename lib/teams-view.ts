@@ -33,11 +33,16 @@ export function safePhotoHref(url: string): string {
   return safeStoredImageHref(url);
 }
 
-// 'club' = an island member club; 'national' = a USVI national team (no single island).
-// Mirrors the 0024 CHECK.
-export type TeamKind = "club" | "national";
+// 'club' = an island member club; 'national' = a USVI national team (no single island);
+// 'guest' = a lightweight opponent (country + flag, no roster, no island — schedule D5).
+// Mirrors the 0026 CHECK (supersedes 0024).
+export type TeamKind = "club" | "national" | "guest";
 
-export const TEAM_KIND_LABELS: Record<TeamKind, string> = {
+// The kinds an editor manages through the teams admin form. Guests are loaded by the
+// schedule seed and stay out of the /teams directory and the admin kind <select>.
+export type MemberTeamKind = Exclude<TeamKind, "guest">;
+
+export const TEAM_KIND_LABELS: Record<MemberTeamKind, string> = {
   national: "National team",
   club: "Club",
 };
@@ -49,7 +54,8 @@ export interface Team {
   slug: string; // URL-safe key for the /teams/[slug] detail page
   kind: TeamKind;
   shortName: string; // '' → use name
-  island: Island | null; // null only for national teams (0024 CHECK)
+  island: Island | null; // null for national + guest teams (0024 CHECK)
+  countryCode: string | null; // ISO 3166-1 alpha-2, uppercase; required for guests (0026)
   division: string; // free text: Men's / Women's / Coed / Youth
   description: string;
   logoUrl: string;
@@ -69,6 +75,7 @@ export interface TeamPlayer {
   hometown: string;
   photoUrl: string;
   sortOrder: number;
+  active: boolean; // false = deactivated (players are never deleted — schedule D4, 0026)
 }
 
 // A team paired with its ordered roster — the shape the detail read returns.

@@ -4,6 +4,9 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { SITE_URL } from "@/lib/site";
+import { getLocale } from "@/lib/i18n/server";
+import { LocaleProvider } from "@/lib/i18n/client";
 
 // SELF-HOSTED fonts — `next build` performs NO build-time network fetch (a
 // network-less CI / Fly build would fail with `next/font/google`). Geist ships its
@@ -20,20 +23,26 @@ const oswald = localFont({
   display: "swap",
 });
 
+// metadataBase makes relative metadata URLs (canonical, hreflang alternates) absolute against
+// the production origin — a constant, so the env-free build resolves the same URLs.
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "USVI Softball Federation",
   description:
     "Official home of the U.S. Virgin Islands Softball Federation — news, teams, events, and more.",
 };
 
-export default function RootLayout({
+// `lang` follows the request locale (proxy.ts → x-locale), and the LocaleProvider hands it to
+// Client Components (nav, switcher). Reading the header makes every route request-time rendered.
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
     <html
-      lang="en"
+      lang={locale}
       className={cn(
         "h-full",
         "antialiased",
@@ -43,7 +52,9 @@ export default function RootLayout({
         "font-sans",
       )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

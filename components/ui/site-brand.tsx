@@ -1,14 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
+import { getLocale } from "@/lib/i18n/server";
+import { localizePath } from "@/lib/i18n/locale";
 
 // The masthead logo lockup: the federation crest + wordmark, linking home, navy on the frosty
 // nav. On desktop, while the header is in its home-at-top state (StickyHeader data-hero), the
 // crest grows to 80px and overhangs the hero by ~32px: the -mb keeps its in-flow footprint at
 // the normal 36px so the bar height never changes. Reduced motion skips the transition.
-export function SiteBrand({ className = "" }: { className?: string }) {
+export async function SiteBrand({ className = "" }: { className?: string }) {
+  const locale = await getLocale(); // links to the current locale's home (/ or /es)
   return (
     <Link
-      href="/"
+      href={localizePath(locale, "/")}
       data-testid="site-brand"
       className={`inline-flex items-center gap-2 font-display uppercase font-bold tracking-tight leading-none text-navy text-lg sm:text-xl ${className}`}
     >

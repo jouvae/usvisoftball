@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import WebSocketImpl from "ws";
 
 // supabase-js eagerly constructs a RealtimeClient, which needs a WebSocket
@@ -17,9 +18,12 @@ if (typeof globalThis.WebSocket === "undefined") {
 // network round-trip that also REFRESHES the auth cookie as a side effect), and
 // returns the cookie-synced response together with the user. Returning THIS exact
 // response keeps the rotated auth cookies in sync. Uses the publishable/anon key.
+// The cookie-bound `supabase` client is returned too, so the proxy can make one RLS read as
+// the signed-in user (the scorekeeper confinement in proxy.ts).
 export async function updateSession(request: NextRequest): Promise<{
   response: NextResponse;
   user: { id: string } | null;
+  supabase: SupabaseClient;
 }> {
   let response = NextResponse.next({ request });
 
@@ -50,5 +54,5 @@ export async function updateSession(request: NextRequest): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { response, user };
+  return { response, user, supabase };
 }

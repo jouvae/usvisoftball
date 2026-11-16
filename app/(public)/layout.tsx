@@ -10,10 +10,14 @@ import { SiteFooter } from "@/components/ui/site-footer";
 // Google Analytics loads on the public site only (never /admin), and only when the build
 // set a measurement ID (prod). The tag loads after hydration and GA4 records client-side
 // navigations through its history-change tracking.
+// `modal` is the @modal parallel slot: empty (default.tsx) except while an in-site click on an
+// event is intercepted into the event modal/drawer (schedule D7).
 export default function PublicLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  modal: React.ReactNode;
 }>) {
   return (
     <>
@@ -22,6 +26,7 @@ export default function PublicLayout({
         {children}
       </main>
       <SiteFooter />
+      {modal}
       {GA_MEASUREMENT_ID ? <GoogleAnalytics gaId={GA_MEASUREMENT_ID} /> : null}
     </>
   );
