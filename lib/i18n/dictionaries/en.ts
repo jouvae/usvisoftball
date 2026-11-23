@@ -98,10 +98,12 @@ export const en = {
     allTeams: "All teams",
     rounds: {
       opening_round: "Opening round",
+      placement_round: "Placement round",
       super_round: "Super round",
       semifinal: "Semifinal",
       final: "Final",
       bronze: "Bronze medal game",
+      gold: "Gold medal game",
     } as Record<string, string>,
   },
 };

@@ -1,5 +1,15 @@
 # Changelog: softball/schedule
 
+## 2026-11-16 — CAC Games 2026 results import (schedule-db-003)
+
+**Built:** `lib/seed/cacg-fixtures.ts` (transcribed from WBSC report NR. 6 by a parser that
+cross-checks every box score against the report's own Totals, pitching vs. opponent R/H, and USVI
+season lines vs. the team page) + `scripts/seed-cacg.ts` / `npm run seed:cacg` (idempotent upserts;
+loads FINAL state, line scores, H/E and USVI box scores). New round keys `placement_round`, `gold`
+(en/es). **Loaded to prod:** tournament + 7 guest "Women" teams + 15 USVI women's players + 22 games
+(20 final, 244 inning rows, 64 USVI stat lines). **Held:** opponent box scores (D6), medal-game scores
+(not in report).
+
 ## 2026-11-15 — S5 timeline, calendar, sitemap/robots
 
 **Built:** EventsView switcher gains **Timeline** and **Calendar** (`?view=timeline|calendar`).

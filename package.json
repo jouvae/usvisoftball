@@ -12,6 +12,7 @@
     "seed:contributor": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-contributor.ts",
     "seed:about": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-about.ts",
     "seed:panam": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-panam.ts",
+    "seed:cacg": "node --conditions=react-server --env-file=.env.local --import tsx scripts/seed-cacg.ts",
     "test:e2e": "playwright test",
     "test:unit": "vitest run"
   },

@@ -97,10 +97,12 @@ export const es = {
     allTeams: "Todos los equipos",
     rounds: {
       opening_round: "Ronda inicial",
+      placement_round: "Grupo de posiciones",
       super_round: "Súper ronda",
       semifinal: "Semifinal",
       final: "Final",
       bronze: "Juego por el bronce",
+      gold: "Juego por el oro",
     } as Record<string, string>,
   },
 } satisfies Dictionary;
