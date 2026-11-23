@@ -1,9 +1,10 @@
-import { safePhotoHref } from "@/lib/teams-view";
+import { safePhotoHref, showBatsThrows } from "@/lib/teams-view";
 import type { TeamPlayer } from "@/lib/teams";
 
 // The roster table on a team detail page (teams-web-002). Server Component — no
-// interactivity. Columns: No. / Name / Position / Bats-Throws, ordered by the caller. All
-// values React-escaped. Empty roster → a friendly note (real empty-state branch).
+// interactivity. Columns: No. / Name / Position / Bats-Throws, ordered by the caller; B/T only
+// when someone has it. All values React-escaped. The page omits the whole block for an empty
+// roster (home-feed Phase B), so there is no "coming soon" state.
 export function TeamRoster({
   players,
   testId = "team-roster",
@@ -11,13 +12,8 @@ export function TeamRoster({
   players: TeamPlayer[];
   testId?: string;
 }) {
-  if (players.length === 0) {
-    return (
-      <p data-testid="team-roster-empty" className="text-muted">
-        Roster coming soon.
-      </p>
-    );
-  }
+  if (players.length === 0) return null;
+  const bt = showBatsThrows(players);
 
   return (
     <div className="overflow-x-auto">
@@ -30,7 +26,7 @@ export function TeamRoster({
             <th className="py-2 pr-4 font-semibold">No.</th>
             <th className="py-2 pr-4 font-semibold">Name</th>
             <th className="py-2 pr-4 font-semibold">Pos</th>
-            <th className="py-2 font-semibold">B/T</th>
+            {bt ? <th className="py-2 font-semibold">B/T</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -66,9 +62,11 @@ export function TeamRoster({
               <td data-testid="player-position" className="py-2 pr-4 text-muted">
                 {p.position || "—"}
               </td>
-              <td data-testid="player-bt" className="py-2 text-muted">
-                {p.batsThrows || "—"}
-              </td>
+              {bt ? (
+                <td data-testid="player-bt" className="py-2 text-muted">
+                  {p.batsThrows || "—"}
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>

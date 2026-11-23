@@ -1,14 +1,22 @@
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { runTotals, type EventWithGame, type Locale } from "@/lib/schedule-view";
+import { eventSlotEnd, runTotals, type EventWithGame, type Locale } from "@/lib/schedule-view";
 
-type Tone = "upcoming" | "live" | "final" | "alert";
+type Tone = "upcoming" | "live" | "final" | "alert" | "pending";
+
+// The event fields the state needs. Timing is optional so a bare {status, game} still works;
+// without `startsAt` a pregame game is simply Upcoming.
+type StateInput = Pick<EventWithGame, "status" | "game"> &
+  Partial<Pick<EventWithGame, "type" | "startsAt" | "endsAt">>;
 
 // The state of an event as a label + tone: a postponed/cancelled status wins; then the game
 // state (pregame → Upcoming, live → Live · Inning n, final → "Final · 3–1", away–home).
-// Ceremonies → Upcoming. The "upcoming" tone is rendered visually hidden (no chip on screen).
+// A pregame game whose start has passed is never "Upcoming" (home-feed Phase B): during its
+// slot it is "In progress", after it "Final · score pending" — results are never invented.
+// A past ceremony reads "Past". The "upcoming" tone is rendered visually hidden (no chip).
 export function eventState(
-  event: Pick<EventWithGame, "status" | "game">,
+  event: StateInput,
   locale: Locale,
+  now: Date = new Date(),
 ): { label: string; tone: Tone } {
   const t = getDictionary(locale).schedule;
   if (event.status === "postponed") return { label: t.statePostponed, tone: "alert" };
@@ -24,6 +32,11 @@ export function eventState(
       tone: "live",
     };
   }
+  if (event.startsAt && now.getTime() >= Date.parse(event.startsAt)) {
+    if (!g) return { label: t.statePast, tone: "upcoming" };
+    const ended = now.getTime() >= eventSlotEnd({ startsAt: event.startsAt, endsAt: event.endsAt ?? null });
+    return { label: ended ? t.stateScorePending : t.stateInProgress, tone: "pending" };
+  }
   return { label: t.stateUpcoming, tone: "upcoming" };
 }
 
@@ -33,6 +46,8 @@ const TONES: Record<Exclude<Tone, "upcoming">, string> = {
   live: "bg-red-600 text-white",
   final: "bg-navy text-navy-foreground",
   alert: "bg-amber-100 text-amber-900 ring-1 ring-amber-300",
+  // Awaiting a score: outlined, not filled — it must not read as a result.
+  pending: "bg-white text-navy ring-1 ring-inset ring-navy/40",
 };
 
 // The small state pill shared by list rows, cards and the event header. Only Live, Final (with
@@ -44,7 +59,7 @@ export function EventStateChip({
   testId,
   className = "",
 }: {
-  event: Pick<EventWithGame, "status" | "game">;
+  event: StateInput;
   locale: Locale;
   testId?: string;
   className?: string;

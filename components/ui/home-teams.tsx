@@ -6,6 +6,8 @@ import { CornerSlash } from "@/components/ui/motifs/corner-slash";
 import { SectionHeader } from "@/components/ui/section-header";
 import { safeStoredImageHref } from "@/lib/safe-image-url";
 import type { Team } from "@/lib/teams-view";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { localizePath, type Locale } from "@/lib/i18n/locale";
 
 // A short monogram for the no-photo variant: the short name when it is one short word
 // ("U18s"), else the initials of the full name ("Women's National Team" → "WNT").
@@ -24,7 +26,8 @@ function monogram(team: Team): string {
 // then a navy panel with a gold corner slash, title, 2–3 lines, and a gold "Meet the …"
 // affordance. The whole card is ONE link (the title link's `absolute inset-0`); the button
 // is a visual cue inside it, not a second link.
-function TeamFeatureCard({ team }: { team: Team }) {
+function TeamFeatureCard({ team, locale }: { team: Team; locale: Locale }) {
+  const t = getDictionary(locale).home;
   const cover = safeStoredImageHref(team.coverImageUrl);
   return (
     <li
@@ -36,7 +39,7 @@ function TeamFeatureCard({ team }: { team: Team }) {
         {cover ? (
           <Image
             src={cover}
-            alt={`${team.name} team photo`}
+            alt={t.teamPhoto.replace("{team}", team.name)}
             fill
             sizes="(min-width: 640px) 50vw, 100vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
@@ -54,7 +57,7 @@ function TeamFeatureCard({ team }: { team: Team }) {
         <CornerSlash corner="tr" className="-top-7 size-10" />
         <h3 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
           <Link
-            href={`/teams/${team.slug}`}
+            href={localizePath(locale, `/teams/${team.slug}`)}
             data-testid="home-team-link"
             className="outline-accent focus:outline-2 focus:outline-offset-4"
           >
@@ -69,7 +72,7 @@ function TeamFeatureCard({ team }: { team: Team }) {
           aria-hidden="true"
           className={`${buttonVariants({ variant: "accent", size: "cta" })} mt-auto w-fit`}
         >
-          Meet the {team.shortName || team.name}
+          {t.meetTeam.replace("{team}", team.shortName || team.name)}
           <ArrowRight />
         </span>
       </div>
@@ -79,7 +82,8 @@ function TeamFeatureCard({ team }: { team: Team }) {
 
 // Home "Our Teams" section — the national teams, 2-up (3-up on lg when there are three).
 // The caller omits the section when there are none.
-export function HomeTeamsSection({ teams }: { teams: Team[] }) {
+export function HomeTeamsSection({ teams, locale }: { teams: Team[]; locale: Locale }) {
+  const t = getDictionary(locale).home;
   return (
     <section
       data-testid="home-teams"
@@ -88,14 +92,14 @@ export function HomeTeamsSection({ teams }: { teams: Team[] }) {
     >
       <SectionHeader
         id="home-teams-heading"
-        title="Our Teams"
-        action={{ href: "/teams", label: "All teams", testId: "home-teams-link" }}
+        title={t.teamsTitle}
+        action={{ href: localizePath(locale, "/teams"), label: t.teamsLink, testId: "home-teams-link" }}
       />
       <ul
         className={`grid gap-6 sm:grid-cols-2 lg:gap-8 ${teams.length >= 3 ? "lg:grid-cols-3" : ""}`}
       >
         {teams.map((team) => (
-          <TeamFeatureCard key={team.id} team={team} />
+          <TeamFeatureCard key={team.id} team={team} locale={locale} />
         ))}
       </ul>
     </section>

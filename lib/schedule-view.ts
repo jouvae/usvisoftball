@@ -594,6 +594,33 @@ export function hasLiveGame(events: readonly Pick<EventWithGame, "game">[]): boo
   return events.some((e) => e.game?.state === "live");
 }
 
+// ── Past games still waiting for a score (home-feed Phase B) ─────────────────────
+
+// A game with no `endsAt` is treated as finished this long after its start: past it, a game
+// still pregame/live reads "Final · score pending" and the admin flags it.
+export const SCORE_PENDING_HOURS = 3;
+
+// When an event's slot is over: `endsAt`, else start + SCORE_PENDING_HOURS.
+export function eventSlotEnd(event: Pick<CalendarEvent, "startsAt" | "endsAt">): number {
+  return event.endsAt
+    ? Date.parse(event.endsAt)
+    : Date.parse(event.startsAt) + SCORE_PENDING_HOURS * 3_600_000;
+}
+
+// A game whose slot is over but whose result isn't in (pregame or still live).
+export function needsScore(
+  event: Pick<EventWithGame, "type" | "status" | "game" | "startsAt" | "endsAt">,
+  now: Date,
+): boolean {
+  return (
+    event.type === "game" &&
+    event.status === "scheduled" &&
+    !!event.game &&
+    event.game.state !== "final" &&
+    now.getTime() >= eventSlotEnd(event)
+  );
+}
+
 // ── S5 timeline + calendar helpers (pure) ────────────────────────────────────────
 
 // How long an event without `endsAt` is assumed to run (timeline range + item width).

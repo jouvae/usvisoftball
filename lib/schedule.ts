@@ -421,6 +421,22 @@ export async function listGamesForTeam(
   return ((data as unknown as EventRow[] | null) ?? []).map(toEventWithGame);
 }
 
+// The game events for a set of game ids (home feed: recap score bars + final highlights).
+export async function listEventsByGameIds(
+  gameIds: readonly string[],
+  supabase: SupabaseClient = createPublicClient(),
+): Promise<EventWithGame[]> {
+  const ids = gameIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from("calendar_events")
+    .select(eventSelect("games!inner"))
+    .in("games.id", ids)
+    .limit(LIST_LIMIT);
+  if (error) throw error;
+  return ((data as unknown as EventRow[] | null) ?? []).map(toEventWithGame);
+}
+
 // The next tournament for the home "Upcoming Event" band: the tournament of the earliest event
 // that has not ended yet (window derived from ALL its events, D2); failing that, the soonest
 // tournament with announced dates still ahead and no events yet. null → no band.

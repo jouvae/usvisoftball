@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import type { SetHighlightState } from "@/app/admin/(protected)/review/[id]/actions";
 
-// The highlight toggle island (MVP slice 4). A button-only twin of
+// The "feature on the home page" toggle (MVP slice 4; since home-feed H4 the newest featured
+// story is the home's lead story — the column is still `is_highlight`). A button-only twin of
 // UnpublishArticleForm: a thin `<form action>` wrapper around the id+next-bound
 // `setHighlight` Server Action (the review page binds BOTH the id and the desired
 // next value server-side, so neither is a forgeable field). Carries no body — the
@@ -44,14 +45,14 @@ export function HighlightToggleForm({
         {pending
           ? "Updating…"
           : isHighlight
-            ? "Remove from home highlights"
-            : "Add to home highlights"}
+            ? "Stop featuring on the home page"
+            : "Feature on the home page"}
       </button>
 
       <p data-testid="highlight-state" className="text-sm text-muted">
         {isHighlight
-          ? "Featured in the home highlights carousel."
-          : "Not featured on the home page."}
+          ? "Featured. The newest featured story is the home page's lead story."
+          : "Not featured. The home page leads with the newest featured story, or the newest story."}
       </p>
     </form>
   );

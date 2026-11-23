@@ -9,7 +9,6 @@ import { AccentRule } from "@/components/ui/motifs/accent-rule";
 import { ArticleCard } from "@/components/ui/article-card";
 import { ContactSection } from "@/components/ui/contact-section";
 import { CommitteesSection } from "@/components/ui/committees-section";
-import { FaqSection } from "@/components/client/faq-section";
 
 // About page — the provided Tailwind UI "About" template's section rhythm (hero → mission
 // + facts → feature image → team → articles), wired to the REAL Supabase reads and the
@@ -229,7 +228,8 @@ export default async function AboutPage() {
           </section>
         ) : null}
 
-        <FaqSection />
+        {/* FAQ: hidden until the board supplies real answers (home-feed Phase B — the component
+            still ships placeholder answers, and placeholders never go public). */}
 
         {contact ? <ContactSection contact={contact} /> : null}
       </div>
