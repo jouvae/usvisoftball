@@ -1,7 +1,7 @@
 /*
 ---
 id: home-hero-involved
-name: "home-hero-involved: home hero, Get Involved section, /get-involved page, crest overhang (home-layout slice 2)"
+name: "home-hero-involved: home Get Involved section + /get-involved page (home-layout slice 2)"
 feature: softball/home-layout
 stack: web
 priority: P0
@@ -9,79 +9,30 @@ group: A
 references:
   - app/(public)/page.tsx
   - app/(public)/get-involved/page.tsx
-  - components/ui/home-hero.tsx
   - components/ui/get-involved.tsx
-  - components/client/sticky-header.tsx
-  - components/ui/site-brand.tsx
   - docs/features/softball/home-layout/design-guide.md
 ---
 
 ## Given
-The home renders <HomeHero> (data-testid home-hero) and <GetInvolvedSection>
-(home-involved). The hero has one <h1> whose accessible name is the full federation name
-(visible "SOFTBALL / FEDERATION" + sr-only "U.S. Virgin Islands"), the tagline, and at most
-two CTAs: Teams (hero-teams-cta → /teams) and Events (hero-events-cta → /events) while
-their flags are on, else News (hero-articles-cta → /articles) and Get Involved
-(hero-involved-cta → /get-involved). The
-section has three audience cards (involved-card-{athletes|volunteers|support}), each with ONE
-link (involved-cta-*). /get-involved has three anchored sections. The sticky header carries
-data-hero="true" only on "/" at scroll-top.
+The home renders <GetInvolvedSection> (home-involved): three audience cards
+(involved-card-{athletes|volunteers|support}), each with ONE link (involved-cta-*).
+/get-involved has three anchored sections. (The hero and its crest-overhang header state were
+removed by softball/home-feed H2 — the lead story is the top of the page; see
+tests/e2e/home-feed/.)
 
 ## When
-(1) An anonymous visitor loads "/". (2) They load "/get-involved". (3) On desktop they
-scroll the home page, and they load /articles.
+(1) An anonymous visitor loads "/". (2) They load "/get-involved".
 
 ## Then
-(1) Exactly one h1, named "U.S. Virgin Islands Softball Federation"; the tagline reads
-"From the Virgin Islands to the World."; ≤2 hero CTAs with the flag-appropriate hrefs; no Support CTA
-in the hero; three involved cards, each with exactly one link — internal ones point at
+(1) Three involved cards, each with exactly one link — internal ones point at
 /get-involved#athletes / #volunteers, the support one is an external PayPal anchor
 (target=_blank, rel noopener) announced as "opens PayPal"; the section link names its
 destination and points at /get-involved. (2) The page responds 200 with an h1 "Get Involved"
-and sections #athletes, #volunteers, #support. (3) data-hero is "true" at top, "false" after
-scrolling, and "false" on /articles.
+and sections #athletes, #volunteers, #support.
 */
 
 import { test, expect } from "@playwright/test";
-import { EVENTS_ENABLED, PAYPAL_DONATE_URL, TEAMS_ENABLED } from "@/lib/flags";
-
-test.describe("home-hero-involved — hero", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-  });
-
-  test("one h1 carrying the full federation name, plus the tagline", async ({ page }) => {
-    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveAccessibleName(
-      "U.S. Virgin Islands Softball Federation",
-    );
-    await expect(page.getByTestId("home-hero-tagline")).toHaveText(
-      "From the Virgin Islands to the World.",
-    );
-  });
-
-  test("at most two CTAs, flag-aware targets, and no Support CTA in the hero", async ({
-    page,
-  }) => {
-    const hero = page.getByTestId("home-hero");
-    await expect(hero.getByRole("link")).toHaveCount(2);
-    // Teams/Events when their flags are on; otherwise the News / Get Involved fallbacks.
-    if (TEAMS_ENABLED) {
-      await expect(page.getByTestId("hero-teams-cta")).toHaveAttribute("href", "/teams");
-    } else {
-      await expect(page.getByTestId("hero-articles-cta")).toHaveAttribute("href", "/articles");
-    }
-    if (EVENTS_ENABLED) {
-      await expect(page.getByTestId("hero-events-cta")).toHaveAttribute("href", "/events");
-    } else {
-      await expect(page.getByTestId("hero-involved-cta")).toHaveAttribute(
-        "href",
-        "/get-involved",
-      );
-    }
-    await expect(hero.locator(`a[href="${PAYPAL_DONATE_URL}"]`)).toHaveCount(0);
-  });
-});
+import { PAYPAL_DONATE_URL } from "@/lib/flags";
 
 test.describe("home-hero-involved — Get Involved section", () => {
   test.beforeEach(async ({ page }) => {
@@ -125,25 +76,5 @@ test.describe("home-hero-involved — /get-involved page", () => {
     for (const id of ["athletes", "volunteers", "support"]) {
       await expect(page.locator(`section#${id}`)).toBeVisible();
     }
-  });
-});
-
-test.describe("home-hero-involved — crest overhang state (desktop)", () => {
-  test.beforeEach(async ({}, testInfo) => {
-    test.skip(
-      testInfo.project.name !== "desktop",
-      "The crest overhang is a desktop (lg+) treatment",
-    );
-  });
-
-  test("data-hero is true only on the home page at scroll-top", async ({ page }) => {
-    await page.goto("/");
-    const header = page.getByTestId("site-header");
-    await expect(header).toHaveAttribute("data-hero", "true");
-    await page.mouse.wheel(0, 600);
-    await expect(header).toHaveAttribute("data-hero", "false");
-
-    await page.goto("/articles");
-    await expect(page.getByTestId("site-header")).toHaveAttribute("data-hero", "false");
   });
 });

@@ -3,7 +3,13 @@ import Link from "next/link";
 import { EventStateChip } from "@/components/ui/event-state-chip";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { requireAnyRole } from "@/lib/roles";
-import { formatEventTime, formatShortDate, isUsviGame, venueZoneLabel } from "@/lib/schedule-view";
+import {
+  formatEventTime,
+  formatShortDate,
+  isUsviGame,
+  needsScore,
+  venueZoneLabel,
+} from "@/lib/schedule-view";
 import { listScoringGames, scoringDayGroup } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Scoring" };
@@ -13,9 +19,12 @@ const GROUP_LABEL = { today: "Today", upcoming: "Coming up", past: "Finished" } 
 // /admin/scoring (schedule overview §6 item 1, §6.1): every game, today's first (venue-local),
 // then upcoming, then recent; USVI games first within a day. One big tap row per game.
 // Scorekeeper OR editor; anyone else is redirected (requireAnyRole → /admin or login).
+// A game whose slot is over without a final score is flagged "Needs score" (home-feed Phase B)
+// — the public site shows it as "Final · score pending" until then.
 export default async function ScoringGamesPage() {
   await requireAnyRole(["scorekeeper", "editor"]);
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
   const games = await listScoringGames(nowIso);
 
   return (
@@ -31,6 +40,7 @@ export default async function ScoringGamesPage() {
             group === "today"
               ? `Today · ${formatEventTime(row.startsAt, row.timezone, "en")}`
               : `${formatShortDate(row.startsAt, row.timezone, "en")} · ${formatEventTime(row.startsAt, row.timezone, "en")}`;
+          const missing = needsScore(row, now);
           return (
             <li key={row.id}>
               <Link
@@ -38,6 +48,7 @@ export default async function ScoringGamesPage() {
                 data-testid="scoring-game-link"
                 data-slug={row.slug}
                 data-group={group}
+                data-needs-score={missing ? "true" : undefined}
                 className={`flex min-h-16 flex-col gap-2 rounded-2xl bg-white px-4 py-3 ring-1 outline-focus hover:bg-surface focus-visible:outline-2 ${isUsviGame(row.game) ? "ring-2 ring-navy" : "ring-border"}`}
               >
                 <span className="flex items-center justify-between gap-3 text-sm text-muted">
@@ -45,7 +56,17 @@ export default async function ScoringGamesPage() {
                     <span className="font-semibold text-navy">{GROUP_LABEL[group]}</span> · {when}{" "}
                     {venueZoneLabel(row.timezone, "en")}
                   </span>
-                  <EventStateChip event={row} locale="en" />
+                  <span className="flex items-center gap-2">
+                    {missing ? (
+                      <span
+                        data-testid="scoring-needs-score"
+                        className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-300"
+                      >
+                        Needs score
+                      </span>
+                    ) : null}
+                    <EventStateChip event={row} locale="en" />
+                  </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <TeamBadge team={row.game.away} locale="en" size="md" />

@@ -24,6 +24,7 @@
 | S5 Timeline/calendar, sitemap, rest of Spanish, contract migration | in progress (uncommitted) | timeline + calendar views, list `?date=` filter, sitemap.xml + robots.txt GREEN (unit-011..014, web-021..023; desktop + mobile). Remaining: rest of Spanish page bodies, contract migration |
 
 ## Open questions (owner: human)
+- CAC Games medal game scores (21 bronze MEX–DOM, 22 gold USVI–PUR) — not in the WBSC report; ranking says PUR gold, USVI silver, DOM bronze. Add to `lib/seed/cacg-fixtures.ts` and re-run `npm run seed:cacg`.
 - Opponent box scores (D6) — board decision.
 - Live stream URL for the Pan Am (flyer says "watch live at usvisoftball.org").
 - U18 roster (names, numbers, positions) — shows "Roster to be announced" until supplied.

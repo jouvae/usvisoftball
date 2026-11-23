@@ -7,7 +7,10 @@ import { ArticleStatusBadge } from "@/components/ui/article-status-badge";
 import { PublishArticleForm } from "@/components/client/publish-article-form";
 import { UnpublishArticleForm } from "@/components/client/unpublish-article-form";
 import { HighlightToggleForm } from "@/components/client/highlight-toggle-form";
-import { publishArticle, unpublishArticle, setHighlight } from "./actions";
+import { ArticleGameForm, type GameOption } from "@/components/client/article-game-form";
+import { EVENTS_ENABLED } from "@/lib/flags";
+import { eventDisplayTitle, formatShortDate, listEvents, USVI_COUNTRY } from "@/lib/schedule";
+import { publishArticle, unpublishArticle, setHighlight, setLinkedGame } from "./actions";
 
 // The DB row is mutable and read via the cookie session client, so force
 // per-request rendering — the status badge must reflect the live row after a publish
@@ -29,6 +32,17 @@ export default async function ReviewPage({
   const supabase = await createSupabaseServerClient();
   const article = await getArticleById(id, supabase);
   if (!article) notFound();
+  // USVI games for the "Linked game" picker (home-feed H9), newest first.
+  const gameOptions: GameOption[] = EVENTS_ENABLED
+    ? (await listEvents({ teamCountry: USVI_COUNTRY }))
+        .filter((e) => e.game)
+        .reverse()
+        .map((e) => ({
+          id: e.game!.id,
+          label: `${formatShortDate(e.startsAt, e.timezone, "en")} · ${eventDisplayTitle(e, "en")}`,
+          group: e.tournament?.name ?? "Other games",
+        }))
+    : [];
 
   return (
     <section data-testid="review-view" className="flex flex-col gap-6">
@@ -97,6 +111,14 @@ export default async function ReviewPage({
           />
           <UnpublishArticleForm action={unpublishArticle.bind(null, id)} />
         </>
+      ) : null}
+
+      {gameOptions.length > 0 ? (
+        <ArticleGameForm
+          action={setLinkedGame.bind(null, id)}
+          gameId={article.gameId}
+          options={gameOptions}
+        />
       ) : null}
 
       {article.status === "unpublished" ? (

@@ -113,7 +113,7 @@ export default async function TeamDetailPage({
         </div>
       ) : null}
 
-      {guest ? null : (
+      {guest || players.length === 0 ? null : (
         <div className="flex flex-col gap-4">
           <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-navy">
             Roster

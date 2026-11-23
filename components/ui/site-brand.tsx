@@ -4,9 +4,8 @@ import { getLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/locale";
 
 // The masthead logo lockup: the federation crest + wordmark, linking home, navy on the frosty
-// nav. On desktop, while the header is in its home-at-top state (StickyHeader data-hero), the
-// crest grows to 80px and overhangs the hero by ~32px: the -mb keeps its in-flow footprint at
-// the normal 36px so the bar height never changes. Reduced motion skips the transition.
+// nav. (The home-at-top oversized crest went with the hero — home-feed H2: the lead story now
+// sits directly under the header, so nothing may overhang it.)
 export async function SiteBrand({ className = "" }: { className?: string }) {
   const locale = await getLocale(); // links to the current locale's home (/ or /es)
   return (
@@ -22,7 +21,7 @@ export async function SiteBrand({ className = "" }: { className?: string }) {
         width={256}
         height={240}
         loading="eager"
-        className="h-8 w-auto drop-shadow-sm transition-[height,margin] duration-300 motion-reduce:transition-none sm:h-9 lg:group-data-[hero=true]/header:-mb-11 lg:group-data-[hero=true]/header:h-20"
+        className="h-8 w-auto drop-shadow-sm sm:h-9"
       />
       USVI SOFTBALL FEDERATION
     </Link>

@@ -82,3 +82,8 @@ export interface TeamPlayer {
 export interface TeamWithRoster extends Team {
   players: TeamPlayer[];
 }
+
+// The roster's B/T column only renders when at least one player has it (home-feed Phase B).
+export function showBatsThrows(players: readonly Pick<TeamPlayer, "batsThrows">[]): boolean {
+  return players.some((p) => p.batsThrows.trim() !== "");
+}

@@ -81,15 +81,29 @@ async function readCommitteeByName(name: string): Promise<CommitteeRow | null> {
   return (data as CommitteeRow | null) ?? null;
 }
 
-async function readSeededCommittee(): Promise<CommitteeRow> {
+// The RLS-denial target: a marker committee created out of band (service key) for this test.
+// The 0011 seed committees were removed from prod (home-feed Phase B — they were placeholder
+// names), so the spec brings its own row; deleteMarkerCommittees() removes it in teardown.
+async function createTargetCommittee(): Promise<CommitteeRow> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("committees")
+    .insert({ name: `${MARKER_PREFIX} target`, slug: `${MARKER_PREFIX}-target-${randomUUID()}` })
+    .select("id,name,slug")
+    .single();
+  if (error) throw error;
+  return data as CommitteeRow;
+}
+
+async function readCommitteeById(id: string): Promise<CommitteeRow | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("committees")
     .select("id,name,slug")
-    .eq("slug", "competition")
-    .single();
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw error;
-  return data as CommitteeRow;
+  return (data as CommitteeRow | null) ?? null;
 }
 
 async function deleteMarkerCommittees(): Promise<void> {
@@ -293,7 +307,7 @@ test.describe("about-e2e-012 — editor committee CRUD + authz/RLS (desktop)", (
   test("(b) contributor + anon gated; raw PostgREST writes denied by RLS", async ({
     page,
   }) => {
-    const seeded = await readSeededCommittee();
+    const seeded = await createTargetCommittee();
 
     // --- contributor: signed in, not an editor → redirected off /admin/committees.
     await signIn(page, CONTRIBUTOR_EMAIL, CONTRIBUTOR_PASSWORD, "contributor");
@@ -332,11 +346,11 @@ test.describe("about-e2e-012 — editor committee CRUD + authz/RLS (desktop)", (
     });
     expect(denied(cDelete), `contributor DELETE denied (got ${cDelete.status})`).toBe(true);
 
-    // dcon: no marker row was inserted, and the seeded committee is untouched.
+    // dcon: no marker row was inserted, and the target committee is untouched.
     expect(await readCommitteeByName(`${MARKER_PREFIX} anon`), "no anon row").toBeNull();
     expect(await readCommitteeByName(`${MARKER_PREFIX} contrib`), "no contrib row").toBeNull();
-    const after = await readSeededCommittee();
-    expect(after.name, "seeded committee name unchanged").toBe(seeded.name);
-    expect(after.id, "seeded committee not deleted").toBe(seeded.id);
+    const after = await readCommitteeById(seeded.id);
+    expect(after?.name, "target committee name unchanged").toBe(seeded.name);
+    expect(after?.id, "target committee not deleted").toBe(seeded.id);
   });
 });

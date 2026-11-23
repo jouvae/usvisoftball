@@ -119,3 +119,12 @@ range in venue-local time, clamped (range 9–17: 09:00 → 0, 13:00 → 0.5, 17
 **schedule-unit-014 Default calendar month.** `defaultCalendarMonth(events, nowIso, tz)` →
 `"YYYY-MM"` of the first event whose venue-local date is today or later (an event earlier today
 still counts); none upcoming → the latest event's month; no events → the current venue-local month.
+
+## Results import — 2026 Central American and Caribbean Games
+
+**schedule-db-003 CAC Games results seed.** After `npm run seed:cacg` (twice — idempotent) the
+`2026-central-american-and-caribbean-games-softball` tournament has 22 game events at Santo Domingo
+(UTC−4): games 1–20 `final` with line scores matching WBSC report NR. 6 (200 runs, 279 hits), USVI
+(`womens-national-team`) box scores for its 5 games (AB 144, R 47, H 59, 30⅓ IP), 15 USVI players;
+games 21 (bronze, MX@DO) and 22 (gold, VI@PR) `pregame` — no result in the report. Opponent box
+scores are not loaded (D6). Pinned by `tests/unit/cacg-fixtures.test.ts`.

@@ -14,18 +14,18 @@ references:
 ---
 
 ## Given
-The `committees` table (public-read RLS) holds the four standing committees in
-sort_order, each with its `committee_members` (7 total), also public-read.
+The `committees` table (public-read RLS) with its `committee_members`, read out of band. The
+0011 seed committees (placeholder names) were deleted from prod on 2026-11-23 (home-feed Phase
+B); the board adds real ones through /admin/committees.
 
 ## When
 An anonymous visitor opens /about.
 
 ## Then
-The Committees section (`about-committees`) renders exactly 4 `committee` cards in
-sort_order — asserted against a service-key read of `committees` so the test tracks
-the seed rather than hard-coded strings. Each card shows a `committee-description`.
-The total `committee-member` count is 7. The Competition committee (first card)
-lists "Rupert James — Chair" and orders members by sort_order (Chair before Member).
+No committees → no Committees section at all (empty sections never render). Otherwise
+`about-committees` renders one `committee` card per row in sort_order (names match the DB
+read), each with its description when set, and the `committee-member` count equals the DB count
+of members on those committees.
 
 Read-only: this spec never mutates the tables, so it needs no teardown and is safe
 to run at both viewports.
@@ -34,75 +34,51 @@ to run at both viewports.
 import { test, expect } from "@playwright/test";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type CommitteeRow = { name: string; slug: string; description: string };
+type CommitteeRow = { id: string; name: string; description: string };
 
-// Out-of-band service-key read: the ordered, seeded committees the page must reflect.
+// Out-of-band service-key read: the ordered committees the page must reflect.
 async function readCommittees(): Promise<CommitteeRow[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("committees")
-    .select("name,slug,description")
+    .select("id,name,description")
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return (data ?? []) as CommitteeRow[];
 }
 
-// Out-of-band count of the seeded members (7), independent of the page.
-async function countMembers(): Promise<number> {
+async function countMembers(committeeIds: string[]): Promise<number> {
+  if (committeeIds.length === 0) return 0;
   const admin = createAdminClient();
   const { count, error } = await admin
     .from("committee_members")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .in("committee_id", committeeIds);
   if (error) throw error;
   return count ?? 0;
 }
 
-test.describe("about-web-011 — public Committees section reflects the seeded committees", () => {
-  test("anon /about renders the 4 committees in sort_order, each with a description + roster", async ({
+test.describe("about-web-011 — public Committees section reflects the committees table", () => {
+  test("anon /about renders the committees in sort_order, or no section when there are none", async ({
     page,
   }) => {
-    // GIVEN: the seeded committees and member count, read out-of-band with the service key.
     const expected = await readCommittees();
-    const expectedMemberCount = await countMembers();
-    expect(expected.length, "seed must hold exactly 4 committees").toBe(4);
-    expect(expectedMemberCount, "seed must hold exactly 7 members").toBe(7);
+    const memberCount = await countMembers(expected.map((c) => c.id));
 
-    // WHEN: an anonymous visitor opens /about.
     await page.goto("/about");
-
-    // THEN: the section and exactly 4 committee cards render.
     const section = page.getByTestId("about-committees");
+
+    if (expected.length === 0) {
+      await expect(section).toHaveCount(0);
+      return;
+    }
+
     await expect(section).toBeVisible();
-
-    const cards = section.getByTestId("committee");
-    await expect(cards).toHaveCount(4);
-
-    // ...in sort_order — the ordered names match the DB read (note "&" renders literally).
-    await expect(section.getByTestId("committee-name")).toHaveText(
-      expected.map((c) => c.name),
+    await expect(section.getByTestId("committee")).toHaveCount(expected.length);
+    await expect(section.getByTestId("committee-name")).toHaveText(expected.map((c) => c.name));
+    await expect(section.getByTestId("committee-description")).toHaveCount(
+      expected.filter((c) => c.description).length,
     );
-
-    // ...each card shows a description (4 descriptions, one per card).
-    await expect(section.getByTestId("committee-description")).toHaveCount(4);
-
-    // ...the total member count across all rosters is 7.
-    await expect(section.getByTestId("committee-member")).toHaveCount(
-      expectedMemberCount,
-    );
-
-    // ...the Competition committee (first card, sort_order 10) lists Rupert James — Chair,
-    //    and orders members by sort_order (Chair before Member).
-    const competition = cards.first();
-    await expect(competition.getByTestId("committee-name")).toHaveText(
-      "Competition Committee",
-    );
-    await expect(competition.getByTestId("committee-member-name")).toHaveText([
-      "Rupert James",
-      "Denise Hodge",
-    ]);
-    await expect(competition.getByTestId("committee-member-role")).toHaveText([
-      "— Chair",
-      "— Member",
-    ]);
+    await expect(section.getByTestId("committee-member")).toHaveCount(memberCount);
   });
 });

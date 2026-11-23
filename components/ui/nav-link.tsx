@@ -44,9 +44,15 @@ export function NavLink({
     <>
       {icon}
       {shortLabel ? (
+        // The short label is CSS-generated text (attr()), so the link's text content is the full
+        // label exactly once — no "ApoyaApoya a la Federación" for crawlers or copy-paste.
         <>
-          <span className="xl:hidden">{shortLabel}</span>
-          <span className="hidden xl:inline">{label}</span>
+          <span
+            aria-hidden="true"
+            data-short={shortLabel}
+            className="before:content-[attr(data-short)] xl:hidden"
+          />
+          <span className="sr-only xl:not-sr-only">{label}</span>
         </>
       ) : (
         label

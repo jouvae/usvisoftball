@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { FeedCursor } from "@/lib/feed-view";
 
 // ---------------------------------------------------------------------------
 // Types (slice-02 §2.1). DB columns are snake_case; this module maps rows to
@@ -46,6 +47,7 @@ export interface Article {
   gallery: GalleryImage[]; // never null; DB default '[]'
   aiProvenance: AiProvenance | null; // { source, model } when source=ai; null otherwise
   isHighlight: boolean; // MVP slice 4: editor-curated home highlight; DB default false
+  gameId: string | null; // home-feed H9: the game a recap covers (score bar); 0029
 }
 
 // Exactly the fields the feed card renders — keeps the payload minimal and makes
@@ -106,6 +108,7 @@ interface ArticleRow extends ArticleListRow {
   gallery: GalleryImage[] | null;
   ai_provenance: AiProvenance | null;
   is_highlight: boolean;
+  game_id: string | null;
 }
 
 const LIST_COLUMNS =
@@ -114,7 +117,7 @@ const LIST_COLUMNS =
 // The FULL column set for the by-slug detail read (slice-03 §2.1). Explicit —
 // so it is obvious `gallery` is included — mirroring LIST_COLUMNS' discipline.
 const ARTICLE_COLUMNS =
-  "id, title, slug, excerpt, cover_image_url, cover_image_alt, author_name, category, published_at, body, status, source, created_at, updated_at, gallery, ai_provenance, is_highlight";
+  "id, title, slug, excerpt, cover_image_url, cover_image_alt, author_name, category, published_at, body, status, source, created_at, updated_at, gallery, ai_provenance, is_highlight, game_id";
 
 function toListItem(row: ArticleListRow): ArticleListItem {
   return {
@@ -144,6 +147,7 @@ function toArticle(row: ArticleRow): Article {
     aiProvenance: row.ai_provenance ?? null,
     // NOT-NULL boolean column (0020); DB default false guarantees a real bool.
     isHighlight: row.is_highlight ?? false,
+    gameId: row.game_id ?? null,
   };
 }
 
@@ -190,6 +194,47 @@ export async function listHomeNews(limit = 3): Promise<HomeNewsItem[]> {
   return (data ?? []).map((row) => {
     const r = row as ArticleListRow & { is_highlight: boolean | null };
     return { ...toListItem(r), isHighlight: r.is_highlight ?? false };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The home feed (feature softball/home-feed, H4–H6). Published rows newest-first with the
+// featured flag and the linked game. Keyset paging on (published_at, id) — `after` is a
+// decoded, validated cursor (lib/feed-view), so its values are safe to put in the filter.
+// `newerThan` serves the "N new stories" check; `featuredOnly` picks the lead.
+// ---------------------------------------------------------------------------
+export type FeedArticle = ArticleListItem & { isHighlight: boolean; gameId: string | null };
+
+export async function listFeedArticles(opts: {
+  limit: number;
+  after?: FeedCursor | null;
+  newerThan?: string | null;
+  excludeId?: string | null;
+  featuredOnly?: boolean;
+}): Promise<FeedArticle[]> {
+  let query = createPublicClient()
+    .from("articles")
+    .select(`${LIST_COLUMNS}, is_highlight, game_id`)
+    .eq("status", "published");
+  if (opts.featuredOnly) query = query.eq("is_highlight", true);
+  if (opts.excludeId) query = query.neq("id", opts.excludeId);
+  if (opts.after) {
+    const { publishedAt: ts, id } = opts.after;
+    query = query.or(`published_at.lt."${ts}",and(published_at.eq."${ts}",id.lt.${id})`);
+  }
+  if (opts.newerThan) {
+    const ms = Date.parse(opts.newerThan);
+    if (Number.isNaN(ms)) return [];
+    query = query.gt("published_at", new Date(ms).toISOString());
+  }
+  const { data, error } = await query
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(opts.limit);
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const r = row as ArticleListRow & { is_highlight: boolean | null; game_id: string | null };
+    return { ...toListItem(r), isHighlight: r.is_highlight ?? false, gameId: r.game_id };
   });
 }
 
@@ -445,6 +490,23 @@ export async function setArticleHighlight(
 
   if (error) throw error; // PGRST116 on 0 rows — caught in the Server Action
   return toArticle(data as ArticleRow);
+}
+
+// Link (or unlink) the game a recap covers (home-feed H9). Editor session client — the 0004
+// articles_editor_update policy is the boundary; the FK rejects an unknown game. `.single()`
+// throws PGRST116 on 0 rows (not an editor / missing id) — the Server Action catches it.
+export async function setArticleGame(
+  id: string,
+  gameId: string | null,
+  supabase: SupabaseClient,
+): Promise<void> {
+  const { error } = await supabase
+    .from("articles")
+    .update({ game_id: gameId })
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error) throw error;
 }
 
 // The editor edit-body Save without publishing (own-or-any row, RLS-enforced by

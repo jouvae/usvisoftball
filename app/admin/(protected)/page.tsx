@@ -146,6 +146,17 @@ export default async function AdminDashboardPage() {
               Home stats
             </Link>
           ) : null}
+          {/* Home highlights (home-feed H7) — editor-only, same canReview gate; the actions
+              re-run requireRole('editor') and the 0029 RLS re-enforces at the row. */}
+          {canReview ? (
+            <Link
+              data-testid="admin-highlights-link"
+              href="/admin/highlights"
+              className="rounded-md border border-border px-4 py-2 font-medium text-brand outline-focus hover:bg-surface focus:outline-2"
+            >
+              Home highlights
+            </Link>
+          ) : null}
           {/* Live scoring (schedule S4) is for scorekeeper OR editor; every scoring Server
               Action re-checks the role and RLS + 0027 re-enforce at the row. */}
           {canScore ? (

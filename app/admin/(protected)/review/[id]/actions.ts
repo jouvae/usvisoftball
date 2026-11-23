@@ -7,11 +7,13 @@ import {
   publishArticle as publishArticleRow,
   unpublishArticle as unpublishArticleRow,
   setArticleHighlight as setArticleHighlightRow,
+  setArticleGame,
 } from "@/lib/articles";
 
 export type PublishArticleState = { error: string } | undefined;
 export type UnpublishArticleState = { error: string } | undefined;
 export type SetHighlightState = { error: string } | undefined;
+export type SetGameState = { error: string; saved?: never } | { saved: true; error?: never } | undefined;
 
 // publishArticle — bound via `publishArticle.bind(null, id)` so the id is a
 // server-closure reference, not a forgeable field (server-actions.md §Security). A
@@ -127,4 +129,33 @@ export async function setHighlight(
   revalidatePath("/"); // home highlights carousel gains/loses this card
   revalidatePath(`/admin/review/${id}`); // toggle label + state line flip
   return undefined;
+}
+
+// setLinkedGame (home-feed H9) — link a recap to the game it covers so its home card shows the
+// score. The id is bound server-side; the game id is untrusted form input: '' unlinks, anything
+// else must be a uuid (the FK then rejects an unknown game → 23503). Editor-only (requireRole)
+// on the SESSION client — RLS articles_editor_update is the boundary.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function setLinkedGame(
+  id: string,
+  _prevState: SetGameState,
+  formData: FormData,
+): Promise<SetGameState> {
+  await requireRole("editor");
+  const raw = String(formData.get("gameId") ?? "").trim();
+  if (raw && !UUID_RE.test(raw)) return { error: "Choose a game from the list." };
+
+  try {
+    await setArticleGame(id, raw || null, await createSupabaseServerClient());
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === "PGRST116" || code === "23503") return { error: "Could not link that game." };
+    throw err;
+  }
+
+  revalidatePath("/");
+  revalidatePath("/es");
+  revalidatePath(`/admin/review/${id}`);
+  return { saved: true };
 }

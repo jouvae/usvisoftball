@@ -58,29 +58,7 @@ drop policy if exists committee_members_public_read on public.committee_members;
 create policy committee_members_public_read on public.committee_members
   for select using (true);
 
--- Seed the standing committees (idempotent on slug).
-insert into public.committees (name, slug, description, sort_order) values
-  ('Competition Committee', 'competition',
-   'Oversees league scheduling, playing rules, and tournament format across the territory.', 10),
-  ('Officials & Umpires Committee', 'officials-umpires',
-   'Recruits, trains, and assigns umpires and scorekeepers for sanctioned games.', 20),
-  ('Youth Development Committee', 'youth-development',
-   'Grows the youth game — clinics, school programs, and the junior national pipeline.', 30),
-  ('Marketing & Communications Committee', 'marketing-communications',
-   'Handles sponsorships, media, and the Federation''s public communications.', 40)
-on conflict (slug) do nothing;
-
--- Seed members, resolving committee_id by slug (idempotent on (committee_id, name)).
-insert into public.committee_members (committee_id, name, role, sort_order)
-select c.id, m.name, m.role, m.sort_order
-from public.committees c
-join (values
-  ('competition',                'Rupert James',    'Chair',  10),
-  ('competition',                'Denise Hodge',    'Member', 20),
-  ('officials-umpires',          'Carlos Mendez',   'Chair',  10),
-  ('officials-umpires',          'Angela Bryan',    'Member', 20),
-  ('youth-development',          'Marcia Todman',   'Chair',  10),
-  ('youth-development',          'Kevin Liburd',    'Member', 20),
-  ('marketing-communications',   'Simone Roberts',  'Chair',  10)
-) as m(cslug, name, role, sort_order) on m.cslug = c.slug
-on conflict (committee_id, name) do nothing;
+-- (Seed rows removed 2026-11-23, feature softball/home-feed Phase B.) This migration used to
+-- insert four standing committees and seven members with placeholder names. They were deleted
+-- from prod and the inserts removed here so a replay can never bring them back: the public
+-- Committees section stays hidden until the board enters real committees in /admin/committees.
