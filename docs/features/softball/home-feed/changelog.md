@@ -21,3 +21,10 @@ FAQ (placeholder answers) hidden. Team page hides an empty roster block and an a
 column. The 0011 seed committees (placeholder names) were deleted from prod and their inserts
 removed from the migration — the Committees section hides until real ones exist. Retired `home-highlights.spec.ts` (old 3-card grid) and the hero/crest cases of
 `home-hero-involved.spec.ts`.
+
+## 2026-11-23 — Reader-local dates
+
+Article publish dates (article page, home feed, article cards) are stored in UTC and shown in the
+reader's own time zone via `components/client/local-date.tsx` (server/hydration render in USVI time,
+then the browser's zone through `useSyncExternalStore` — no hydration mismatch). Fixes the article
+page showing a UTC date while the feed showed the AST date. `formatArticleDate` (UTC-only) removed.

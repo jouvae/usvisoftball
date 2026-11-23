@@ -5,7 +5,7 @@ import {
   getPublishedArticleBySlug,
   listPublishedArticlesExcept,
 } from "@/lib/articles";
-import { formatArticleDate } from "@/lib/format";
+import { LocalDate } from "@/components/client/local-date";
 import { ArticleHero } from "@/components/ui/article-hero";
 import { ArticleBody } from "@/components/ui/article-body";
 import { ArticleGallery } from "@/components/ui/article-gallery";
@@ -72,12 +72,7 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
           {article.publishedAt ? (
             <>
               <span aria-hidden="true">·</span>
-              <time
-                data-testid="article-date"
-                dateTime={article.publishedAt}
-              >
-                {formatArticleDate(article.publishedAt)}
-              </time>
+              <LocalDate iso={article.publishedAt} style="long" testId="article-date" />
             </>
           ) : null}
         </div>

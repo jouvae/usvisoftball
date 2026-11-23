@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ArticleListItem } from "@/lib/articles";
-import { formatArticleDate } from "@/lib/format";
+import { LocalDate } from "@/components/client/local-date";
 
 export type ArticleCardProps = {
   article: ArticleListItem;
@@ -70,9 +70,7 @@ export function ArticleCard({
       <div className="flex flex-wrap items-center gap-x-2 text-sm text-white/80">
         <span data-testid="article-card-byline">By {authorName}</span>
         <span aria-hidden="true">·</span>
-        <time data-testid="article-card-date" dateTime={publishedAt ?? undefined}>
-          {publishedAt ? formatArticleDate(publishedAt) : ""}
-        </time>
+        {publishedAt ? <LocalDate iso={publishedAt} style="long" testId="article-card-date" /> : null}
       </div>
 
       <Heading
