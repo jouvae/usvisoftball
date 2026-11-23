@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import type { SupportCtaLocation } from "@/lib/analytics";
 
 export type NavLinkProps = {
   href: string;
@@ -11,6 +12,8 @@ export type NavLinkProps = {
   active: boolean;
   variant?: "default" | "cta";
   external?: boolean;
+  // Marks a Support link for the GA click tracker (SupportClickTracker).
+  supportCta?: SupportCtaLocation;
   onNavigate?: () => void;
   className?: string;
 };
@@ -24,6 +27,7 @@ export function NavLink({
   active,
   variant = "default",
   external = false,
+  supportCta,
   onNavigate,
   className = "",
 }: NavLinkProps) {
@@ -81,6 +85,7 @@ export function NavLink({
     <Link
       href={href}
       data-testid={testId}
+      data-support-cta={supportCta}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
       className={`${base} ${variantClass} ${className}`}

@@ -10,6 +10,8 @@ import { ArticleHero } from "@/components/ui/article-hero";
 import { ArticleBody } from "@/components/ui/article-body";
 import { ArticleGallery } from "@/components/ui/article-gallery";
 import { ArticleFeed } from "@/components/ui/article-feed";
+import { SupportBlock } from "@/components/ui/support-block";
+import { getLocale } from "@/lib/i18n/server";
 
 // The article is DB-backed, mutable data read via supabase-js (NOT `fetch`, so
 // Next's fetch cache does not track it). Force per-request rendering so the page
@@ -41,7 +43,7 @@ export async function generateMetadata({
 // at <article>, NOT <main>: the layout owns the sole <main> landmark (slice-01 §2).
 export default async function ArticlePage({ params }: PageProps<"/articles/[slug]">) {
   const { slug } = await params;
-  const article = await getArticle(slug);
+  const [article, locale] = await Promise.all([getArticle(slug), getLocale()]);
   if (!article) notFound();
 
   // The continued feed: every OTHER published article, newest-first, excluding this
@@ -87,6 +89,8 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
       <ArticleBody body={article.body} />
 
       <ArticleGallery images={article.gallery} />
+
+      <SupportBlock locale={locale} />
       </article>
 
       {more.length > 0 ? (
