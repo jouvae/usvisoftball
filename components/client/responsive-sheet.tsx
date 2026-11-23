@@ -36,6 +36,7 @@ export function ResponsiveSheet({
   onClose,
   modalTestId,
   drawerTestId,
+  size = "wide",
   children,
 }: {
   title: string;
@@ -43,6 +44,8 @@ export function ResponsiveSheet({
   onClose: () => void;
   modalTestId?: string;
   drawerTestId?: string;
+  // Modal width at ≥ md: "wide" (event detail) or "narrow" (a short panel such as donate).
+  size?: "wide" | "narrow";
   children: (presentation: SheetPresentation) => ReactNode;
 }) {
   const presentation = usePresentation();
@@ -63,7 +66,7 @@ export function ResponsiveSheet({
             <div className="flex min-h-full items-start justify-center p-4 sm:p-8">
               <Dialog.Popup
                 data-testid={modalTestId}
-                className="relative my-auto w-full max-w-3xl rounded-2xl bg-white shadow-2xl outline-none ring-1 ring-black/5 transition-[opacity,translate] duration-200 data-ending-style:translate-y-4 data-ending-style:opacity-0 data-starting-style:translate-y-4 data-starting-style:opacity-0"
+                className={`relative my-auto w-full ${size === "narrow" ? "max-w-xl" : "max-w-3xl"} rounded-2xl bg-white shadow-2xl outline-none ring-1 ring-black/5 transition-[opacity,translate] duration-200 data-ending-style:translate-y-4 data-ending-style:opacity-0 data-starting-style:translate-y-4 data-starting-style:opacity-0`}
               >
                 <div className="h-1.5 rounded-t-2xl bg-accent" aria-hidden="true" />
                 <div className="flex items-center justify-between gap-4 px-6 pt-4">

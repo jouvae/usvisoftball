@@ -28,10 +28,11 @@ export const EVENTS_ENABLED =
 export const SHOP_ENABLED =
   process.env.NEXT_PUBLIC_SHOP_ENABLED === "true";
 
-// The Donate button (nav) links out to PayPal. Hardcoded (not env) so it survives the
-// env-free Fly build, like next.config's Storage host. TODO: swap PAYPAL_DONATE_URL for
-// the Federation's real PayPal donate link (paypal.me handle or hosted Donate button URL).
-export const PAYPAL_DONATE_URL = "https://www.paypal.com/donate";
+// The Federation's PayPal hosted Donate button. Every "Support" entry point opens /donate (a
+// modal for in-site clicks), which opens PayPal's checkout window from this button id; the
+// plain URL is the fallback link. Hardcoded (not env) so it survives the env-free Fly build.
+export const PAYPAL_HOSTED_BUTTON_ID = "SSAELKMM3V5TJ";
+export const PAYPAL_DONATE_URL = `https://www.paypal.com/donate/?hosted_button_id=${PAYPAL_HOSTED_BUTTON_ID}`;
 
 // Hides the board of directors on the public site (the /about board section, the Past
 // Boards list, and /about/[term]) while its details are being corrected. Inverted on

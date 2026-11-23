@@ -3,7 +3,6 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowRight, ArrowUpRight, Flag, Heart, Users } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
-import { PAYPAL_DONATE_URL } from "@/lib/flags";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { localizePath, type Locale } from "@/lib/i18n/locale";
 
@@ -42,7 +41,7 @@ export function involvementItems(locale: Locale): Involvement[] {
       title: t.supportTitle,
       summary: t.supportSummary,
       icon: Heart,
-      cta: { label: t.supportCta, href: PAYPAL_DONATE_URL, external: true },
+      cta: { label: t.supportCta, href: "/donate", external: false },
     },
   ];
 }
@@ -104,6 +103,7 @@ function InvolvementCard({
         <Link
           href={localizePath(locale, item.cta.href)}
           data-testid={`involved-cta-${item.id}`}
+          data-support-cta={item.id === "support" ? "home_involved" : undefined}
           className={ctaClass}
         >
           {label}

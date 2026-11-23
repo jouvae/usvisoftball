@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ArrowUpRight, Mail } from "lucide-react";
+import Link from "next/link";
+import { Heart, Mail } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { INVOLVEMENT, type Involvement } from "@/components/ui/get-involved";
 import { AccentRule } from "@/components/ui/motifs/accent-rule";
@@ -105,25 +106,23 @@ export default async function GetInvolvedPage() {
                   </p>
                 ))}
                 <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-                  {item.cta.external ? (
-                    <a
+                  {item.id === "support" ? (
+                    <Link
                       href={item.cta.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       data-testid={`involved-page-cta-${item.id}`}
+                      data-support-cta="involved_page"
                       className={buttonVariants({ variant: "accent", size: "cta" })}
                     >
+                      <Heart aria-hidden="true" className="fill-current" />
                       {item.cta.label}
-                      <ArrowUpRight aria-hidden="true" />
-                      <span className="sr-only"> (opens PayPal)</span>
-                    </a>
+                    </Link>
                   ) : null}
                   {mailto ? (
                     <a
                       href={mailto}
                       data-testid={`involved-email-${item.id}`}
                       className={buttonVariants({
-                        variant: item.cta.external ? "outline-light" : "accent",
+                        variant: item.id === "support" ? "outline-light" : "accent",
                         size: "cta",
                       })}
                     >

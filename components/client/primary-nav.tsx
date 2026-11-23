@@ -9,14 +9,13 @@ import { useDictionary, useLocale } from "@/lib/i18n/client";
 import { localizePath, stripLocale } from "@/lib/i18n/locale";
 import {
   EVENTS_ENABLED,
-  PAYPAL_DONATE_URL,
   SHOP_ENABLED,
   TEAMS_ENABLED,
 } from "@/lib/flags";
 
 // Nav (home-layout design guide §3.1): logo (SiteBrand, → home) on the left; Teams · Events ·
-// News · Get Involved · [Shop] · About, then the gold "Support the Federation" pill (external,
-// PayPal) and the EN | ES switcher. Teams/Events/Shop render only while their flags are on.
+// News · Get Involved · [Shop] · About, then the gold "Support the Federation" pill (/donate,
+// opens the donate modal) and the EN | ES switcher. Teams/Events/Shop render only while their flags are on.
 // "News" keeps the /articles route and the nav-link-articles testid; the pill keeps
 // nav-link-donate. Labels come from the locale dictionary; hrefs are localized (/es…).
 type NavKey = "teams" | "events" | "news" | "involved" | "shop" | "about";
@@ -73,14 +72,14 @@ export function PrimaryNav({ className = "" }: { className?: string }) {
           />
         ))}
         <NavLink
-          href={PAYPAL_DONATE_URL}
+          href={localizePath(locale, "/donate")}
           label={t.nav.donate}
           shortLabel={t.nav.donateShort}
           icon={<Heart aria-hidden="true" className="size-4 fill-current" />}
           testId="nav-link-donate"
           active={false}
           variant="cta"
-          external
+          supportCta="nav"
           className="mt-2 justify-center lg:mt-0 lg:ml-3"
           onNavigate={() => setOpen(false)}
         />

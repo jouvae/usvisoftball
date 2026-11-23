@@ -25,14 +25,13 @@ tests/e2e/home-feed/.)
 
 ## Then
 (1) Three involved cards, each with exactly one link — internal ones point at
-/get-involved#athletes / #volunteers, the support one is an external PayPal anchor
-(target=_blank, rel noopener) announced as "opens PayPal"; the section link names its
+/get-involved#athletes / #volunteers, the support one at /donate (the donate modal,
+softball/donate); the section link names its
 destination and points at /get-involved. (2) The page responds 200 with an h1 "Get Involved"
 and sections #athletes, #volunteers, #support.
 */
 
 import { test, expect } from "@playwright/test";
-import { PAYPAL_DONATE_URL } from "@/lib/flags";
 
 test.describe("home-hero-involved — Get Involved section", () => {
   test.beforeEach(async ({ page }) => {
@@ -45,7 +44,7 @@ test.describe("home-hero-involved — Get Involved section", () => {
     const expected = {
       athletes: "/get-involved#athletes",
       volunteers: "/get-involved#volunteers",
-      support: PAYPAL_DONATE_URL,
+      support: "/donate",
     } as const;
     for (const [id, href] of Object.entries(expected)) {
       const card = page.getByTestId(`involved-card-${id}`);
@@ -54,11 +53,10 @@ test.describe("home-hero-involved — Get Involved section", () => {
     }
   });
 
-  test("the support card opens PayPal in a new tab and says so", async ({ page }) => {
+  test("the support card opens the donate panel in place", async ({ page }) => {
     const cta = page.getByTestId("involved-cta-support");
-    await expect(cta).toHaveAttribute("target", "_blank");
-    await expect(cta).toHaveAttribute("rel", /noopener/);
-    await expect(cta).toHaveAccessibleName(/opens PayPal/);
+    await expect(cta).not.toHaveAttribute("target", "_blank");
+    await expect(cta).toHaveAttribute("data-support-cta", "home_involved");
   });
 
   test("the section link names its destination", async ({ page }) => {
