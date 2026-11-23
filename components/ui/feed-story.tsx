@@ -2,20 +2,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { localizePath } from "@/lib/i18n/locale";
-import { ATLANTIC_TZ, formatShortDate, type Locale } from "@/lib/schedule-view";
+import { LocalDate } from "@/components/client/local-date";
+import type { Locale } from "@/lib/schedule-view";
 import type { FeedStory, StoryScore } from "@/lib/feed-view";
 
 // Feature softball/home-feed — the home feed's story pieces (overview §3). Isomorphic: the
 // server renders the first page and the client list renders later pages with the same markup.
-// Dates are absolute and pinned to USVI time, so server and client always print the same text.
+// Dates are stored in UTC and shown in the reader's own zone (LocalDate).
 
 function storyHref(locale: Locale, slug: string): string {
   return localizePath(locale, `/articles/${slug}`);
 }
 
-function storyDate(iso: string | null, locale: Locale): string {
-  return iso ? formatShortDate(iso, ATLANTIC_TZ, locale) : "";
-}
 
 // A recap's score line (H9): away then home, the winner in bold, the state as a word (never
 // colour alone). Pregame games have no score to show, so only live/final render.
@@ -83,9 +81,9 @@ export function FeedStoryRow({ story, locale }: { story: FeedStory; locale: Loca
         {story.excerpt ? (
           <p className="hidden max-w-[68ch] text-muted sm:line-clamp-2">{story.excerpt}</p>
         ) : null}
-        <time dateTime={story.publishedAt ?? undefined} className="text-sm text-muted">
-          {storyDate(story.publishedAt, locale)}
-        </time>
+        {story.publishedAt ? (
+          <LocalDate iso={story.publishedAt} locale={locale} className="text-sm text-muted" />
+        ) : null}
       </div>
       {story.coverImageUrl ? (
         <div className="relative aspect-[4/3] w-24 self-start overflow-hidden rounded-lg bg-surface sm:w-44">
@@ -136,7 +134,7 @@ export function LeadStory({ story, locale }: { story: FeedStory; locale: Locale 
         ) : null}
         <p className="flex flex-wrap gap-x-4 text-sm text-muted">
           <span>{t.byline.replace("{name}", story.authorName)}</span>
-          <time dateTime={story.publishedAt ?? undefined}>{storyDate(story.publishedAt, locale)}</time>
+          {story.publishedAt ? <LocalDate iso={story.publishedAt} locale={locale} /> : null}
         </p>
       </div>
     </article>

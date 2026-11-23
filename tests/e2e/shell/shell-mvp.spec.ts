@@ -16,7 +16,7 @@ references:
 
 ## Given
 An anonymous visitor and the MVP shell: the nav is rebuilt to exactly Articles ·
-About · Donate (Donate is an external PayPal CTA); the old /news feed moved to
+About · Donate (Donate opens /donate — softball/donate); the old /news feed moved to
 /articles with permanent redirects; and Teams/Events are feature-flagged OFF, so
 their routes return 404.
 
@@ -31,7 +31,6 @@ flag-off Teams/Events routes return HTTP 404.
 */
 
 import { test, expect } from "@playwright/test";
-import { PAYPAL_DONATE_URL } from "@/lib/flags";
 
 // The nav links are always attached, but they collapse behind the mobile toggle
 // below the lg breakpoint — so composition (count/href/attributes) is asserted
@@ -96,14 +95,12 @@ test.describe("shell-mvp — primary nav", () => {
     );
   });
 
-  test("Donate is an external new-tab anchor to PayPal", async ({ page }) => {
+  // softball/donate: Support opens the on-site donate panel (/donate), not a PayPal tab.
+  test("Donate is an internal link to /donate, tagged for analytics", async ({ page }) => {
     const donate = page.getByTestId("nav-link-donate");
-    await expect(donate).toHaveAttribute("href", PAYPAL_DONATE_URL);
-    await expect(donate).toHaveAttribute("href", "https://www.paypal.com/donate");
-    await expect(donate).toHaveAttribute("target", "_blank");
-    // rel must include noopener (may also carry noreferrer) so the opened tab
-    // cannot reach back through window.opener.
-    await expect(donate).toHaveAttribute("rel", /noopener/);
+    await expect(donate).toHaveAttribute("href", "/donate");
+    await expect(donate).not.toHaveAttribute("target", "_blank");
+    await expect(donate).toHaveAttribute("data-support-cta", "nav");
   });
 });
 

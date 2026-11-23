@@ -4,7 +4,6 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import { getContactInfo, safeSocialHref } from "@/lib/contact";
 import {
   EVENTS_ENABLED,
-  PAYPAL_DONATE_URL,
   SHOP_ENABLED,
   TEAMS_ENABLED,
 } from "@/lib/flags";
@@ -123,15 +122,13 @@ export async function SiteFooter({ className = "" }: { className?: string }) {
                 </li>
               ))}
               <li>
-                <a
-                  href={PAYPAL_DONATE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={localizePath(locale, "/donate")}
+                  data-support-cta="footer"
                   className={linkClass}
                 >
                   {t.nav.donate}
-                  <span className="sr-only"> {t.footer.opensPaypal}</span>
-                </a>
+                </Link>
               </li>
             </ul>
           </nav>
