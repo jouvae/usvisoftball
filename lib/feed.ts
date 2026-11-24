@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPublicClient } from "@/lib/supabase/public";
 import { listFeedArticles, type FeedArticle } from "@/lib/articles";
 import { listEventsByGameIds } from "@/lib/schedule";
-import { runTotals, teamDisplayName, type EventWithGame, type Locale } from "@/lib/schedule-view";
+import { gameRunTotals, teamDisplayName, type EventWithGame, type Locale } from "@/lib/schedule-view";
 import {
   FEED_PAGE_SIZE,
   HIGHLIGHTS_LIMIT,
@@ -38,7 +38,7 @@ async function withScores(articles: FeedArticle[], locale: Locale): Promise<Feed
   return articles.map(({ gameId, ...a }) => {
     const e = gameId ? byGame.get(gameId) : undefined;
     if (!e?.game) return { ...a, score: null };
-    const r = runTotals(e.game.innings);
+    const r = gameRunTotals(e.game);
     return {
       ...a,
       score: {

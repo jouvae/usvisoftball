@@ -10,12 +10,14 @@ import {
   type EventStatus,
   type EventType,
   type EventWithGame,
+  type GameStandout,
   type GameState,
   type GameWithTeams,
   type Inning,
   type PlayerStatLineWithPlayer,
   type ScheduleTeam,
   type Side,
+  type StandoutKind,
   type Tournament,
   type TournamentWindow,
 } from "@/lib/schedule-view";
@@ -122,6 +124,12 @@ type GameRow = {
   away_errors: number;
   home_hits: number;
   home_errors: number;
+  away_runs: number | null;
+  home_runs: number | null;
+  away_walks: number | null;
+  home_walks: number | null;
+  away_strikeouts: number | null;
+  home_strikeouts: number | null;
   away: TeamRow | TeamRow[] | null;
   home: TeamRow | TeamRow[] | null;
   game_innings: Inning[] | null;
@@ -130,6 +138,7 @@ type GameRow = {
 // games has TWO FKs to teams, so each embed names its FK explicitly.
 const GAME_SELECT =
   "id,event_id,away_team_id,home_team_id,state,current_inning,away_hits,away_errors,home_hits,home_errors," +
+  "away_runs,home_runs,away_walks,home_walks,away_strikeouts,home_strikeouts," +
   `away:teams!games_away_team_id_fkey(${TEAM_COLUMNS}),` +
   `home:teams!games_home_team_id_fkey(${TEAM_COLUMNS}),` +
   "game_innings(inning,side,runs)";
@@ -182,6 +191,12 @@ function toGame(row: GameRow): GameWithTeams | null {
     awayErrors: row.away_errors,
     homeHits: row.home_hits,
     homeErrors: row.home_errors,
+    awayRuns: row.away_runs,
+    homeRuns: row.home_runs,
+    awayWalks: row.away_walks,
+    homeWalks: row.home_walks,
+    awayStrikeouts: row.away_strikeouts,
+    homeStrikeouts: row.home_strikeouts,
     away: toScheduleTeam(away),
     home: toScheduleTeam(home),
     innings: (row.game_innings ?? [])
@@ -435,6 +450,44 @@ export async function listEventsByGameIds(
     .limit(LIST_LIMIT);
   if (error) throw error;
   return ((data as unknown as EventRow[] | null) ?? []).map(toEventWithGame);
+}
+
+// A game's editor-picked standouts (0030), award kinds first then sort_order.
+const KIND_ORDER: Record<StandoutKind, number> = { player_of_game: 0, pitching: 1, standout: 2 };
+export async function listGameStandouts(
+  gameId: string,
+  supabase: SupabaseClient = createPublicClient(),
+): Promise<GameStandout[]> {
+  if (!/^[0-9a-f-]{36}$/i.test(gameId)) return [];
+  const { data, error } = await supabase
+    .from("game_standouts")
+    .select("id,game_id,team_id,kind,player_name,stat_line,note,sort_order")
+    .eq("game_id", gameId)
+    .order("sort_order", { ascending: true })
+    .limit(LIST_LIMIT);
+  if (error) throw error;
+  type Row = {
+    id: string;
+    game_id: string;
+    team_id: string | null;
+    kind: StandoutKind;
+    player_name: string;
+    stat_line: string;
+    note: string;
+    sort_order: number;
+  };
+  return ((data as Row[] | null) ?? [])
+    .map((r) => ({
+      id: r.id,
+      gameId: r.game_id,
+      teamId: r.team_id,
+      kind: r.kind,
+      playerName: r.player_name,
+      statLine: r.stat_line,
+      note: r.note,
+      sortOrder: r.sort_order,
+    }))
+    .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.sortOrder - b.sortOrder);
 }
 
 // The next tournament for the home "Upcoming Event" band: the tournament of the earliest event

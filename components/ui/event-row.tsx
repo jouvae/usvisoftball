@@ -8,7 +8,7 @@ import {
   formatEventTime,
   gameWinner,
   isUsviGame,
-  runTotals,
+  gameRunTotals,
   venueZoneLabel,
   type EventWithGame,
   type Locale,
@@ -41,7 +41,7 @@ export function EventRow({
   const usvi = isUsviGame(event.game);
   const game = event.game;
   const showScore = game != null && game.state !== "pregame";
-  const totals = game ? runTotals(game.innings) : { away: 0, home: 0 };
+  const totals = game ? gameRunTotals(game) : { away: 0, home: 0 };
   const winner = game ? gameWinner(game, totals) : null;
   const tz = event.timezone;
   const atlantic = tz !== ATLANTIC_TZ;

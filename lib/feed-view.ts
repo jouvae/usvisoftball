@@ -3,7 +3,7 @@ import {
   ATLANTIC_TZ,
   SOFTBALL_INNINGS,
   isUsviTeam,
-  runTotals,
+  gameRunTotals,
   teamDisplayName,
   type GameWithTeams,
   type Locale,
@@ -105,7 +105,7 @@ export interface FinalLine {
 // A final game as "winner R, loser R" (localized team names). A tie can't be final in softball;
 // if one ever reaches here, home is listed first.
 export function finalHighlightLine(game: GameWithTeams, locale: Locale): FinalLine {
-  const r = runTotals(game.innings);
+  const r = gameRunTotals(game);
   const awayWon = r.away > r.home;
   const [w, l] = awayWon ? [game.away, game.home] : [game.home, game.away];
   const played = game.innings.reduce((n, i) => Math.max(n, i.inning), 0);
