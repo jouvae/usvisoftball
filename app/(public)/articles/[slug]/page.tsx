@@ -11,6 +11,8 @@ import { ArticleBody } from "@/components/ui/article-body";
 import { ArticleGallery } from "@/components/ui/article-gallery";
 import { ArticleFeed } from "@/components/ui/article-feed";
 import { SupportBlock } from "@/components/ui/support-block";
+import { Scoreboard, ScoreboardDetails } from "@/components/ui/scoreboard";
+import { listEventsByGameIds, listGameStandouts } from "@/lib/schedule";
 import { getLocale } from "@/lib/i18n/server";
 
 // The article is DB-backed, mutable data read via supabase-js (NOT `fetch`, so
@@ -49,7 +51,14 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
   // The continued feed: every OTHER published article, newest-first, excluding this
   // one (MVP slice 3). Excluded at the DB, so it can never list itself. Section is
   // omitted entirely when this is the only published article.
-  const more = await listPublishedArticlesExcept(article.id);
+  // A recap/preview linked to a game gets its Scoreboard (feature softball/scoreboard). Read
+  // from the game, so the article, Events page and feed all show the same result.
+  const [more, gameEvents, standouts] = await Promise.all([
+    listPublishedArticlesExcept(article.id),
+    article.gameId ? listEventsByGameIds([article.gameId]) : Promise.resolve([]),
+    article.gameId ? listGameStandouts(article.gameId) : Promise.resolve([]),
+  ]);
+  const gameEvent = gameEvents.find((e) => e.game) ?? null;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -80,6 +89,8 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
         </div>
       </header>
 
+      {gameEvent ? <Scoreboard event={gameEvent} locale={locale} /> : null}
+
       <ArticleHero
         coverImageUrl={article.coverImageUrl}
         coverImageAlt={article.coverImageAlt}
@@ -87,6 +98,10 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
       />
 
       <ArticleBody body={article.body} />
+
+      {gameEvent?.game ? (
+        <ScoreboardDetails game={gameEvent.game} standouts={standouts} locale={locale} />
+      ) : null}
 
       <ArticleGallery images={article.gallery} />
 

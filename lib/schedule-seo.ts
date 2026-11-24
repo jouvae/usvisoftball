@@ -12,7 +12,7 @@ import {
   formatEventTime,
   formatShortDate,
   isoWithOffset,
-  runTotals,
+  gameRunTotals,
   teamDisplayName,
   venueZoneLabel,
   type EventStatus,
@@ -43,7 +43,7 @@ function tournamentName(event: SeoEvent, locale: Locale): string {
 function finalScoreLine(event: SeoEvent, locale: Locale): string {
   const g = event.game;
   if (!g || g.state !== "final") return "";
-  const r = runTotals(g.innings);
+  const r = gameRunTotals(g);
   return `Final: ${teamDisplayName(g.away, locale)} ${r.away}, ${teamDisplayName(g.home, locale)} ${r.home}`;
 }
 

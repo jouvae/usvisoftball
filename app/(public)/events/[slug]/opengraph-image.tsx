@@ -6,7 +6,7 @@ import {
   eventDisplayTitle,
   gameWinner,
   ogWhenLine,
-  runTotals,
+  gameRunTotals,
   teamDisplayName,
   type GameWithTeams,
 } from "@/lib/schedule";
@@ -95,7 +95,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const tz = event?.timezone ?? "UTC";
   const game = event?.game ?? null;
   const final = game?.state === "final";
-  const totals = game ? runTotals(game.innings) : null;
+  const totals = game ? gameRunTotals(game) : null;
   const tournament = event?.tournamentDetail?.name ?? event?.tournament?.name ?? "";
   const when = event ? ogWhenLine(event.startsAt, tz) : "";
   const winner = game && totals ? gameWinner(game, totals) : null;

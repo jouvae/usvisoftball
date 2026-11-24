@@ -3,7 +3,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import {
   gameWinner,
   lineScoreInningCount,
-  runTotals,
+  gameRunTotals,
   teamDisplayName,
   flagEmoji,
   type GameWithTeams,
@@ -38,7 +38,7 @@ export function LineScore({
 }) {
   const t = getDictionary(locale).schedule;
   const empty = game.state === "pregame" && game.innings.length === 0;
-  const totals = runTotals(game.innings);
+  const totals = gameRunTotals(game);
   const winner = gameWinner(game, totals);
   const count = lineScoreInningCount(game.innings, game.currentInning);
   const innings = Array.from({ length: count }, (_, i) => i + 1);

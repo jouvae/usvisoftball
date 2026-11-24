@@ -106,6 +106,28 @@ export interface Game {
   awayErrors: number;
   homeHits: number;
   homeErrors: number;
+  // 0030 — optional totals. Runs are only read when the game has no innings (a result that
+  // arrived as "8–5"); walks = drawn by that side's batters; strikeouts = by its pitchers.
+  // null/undefined = not recorded.
+  awayRuns?: number | null;
+  homeRuns?: number | null;
+  awayWalks?: number | null;
+  homeWalks?: number | null;
+  awayStrikeouts?: number | null;
+  homeStrikeouts?: number | null;
+}
+
+// An editor-picked standout for a game (0030 `game_standouts`).
+export type StandoutKind = "player_of_game" | "pitching" | "standout";
+export interface GameStandout {
+  id: string;
+  gameId: string;
+  teamId: string | null;
+  kind: StandoutKind;
+  playerName: string;
+  statLine: string;
+  note: string;
+  sortOrder: number;
 }
 
 // One half-inning cell of the line score (0026 `game_innings`).
@@ -226,6 +248,15 @@ export function runTotals(innings: readonly Inning[]): RunTotals {
   const totals: RunTotals = { away: 0, home: 0 };
   for (const cell of innings) totals[cell.side] += cell.runs;
   return totals;
+}
+
+// A game's runs: derived from its innings when it has any (the line score is the truth),
+// otherwise the stored total-only result (0030), otherwise 0.
+export function gameRunTotals(
+  game: Pick<Game, "awayRuns" | "homeRuns"> & { innings: readonly Inning[] },
+): RunTotals {
+  if (game.innings.length > 0) return runTotals(game.innings);
+  return { away: game.awayRuns ?? 0, home: game.homeRuns ?? 0 };
 }
 
 // Number of line-score columns to render: max(SOFTBALL_INNINGS, highest inning, current).

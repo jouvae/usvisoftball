@@ -12,7 +12,7 @@ import {
   googleMapsUrl,
   isUsviTeam,
   localTimeCaption,
-  runTotals,
+  gameRunTotals,
   type EventDetail as EventDetailData,
   type Locale,
   type Side,
@@ -61,7 +61,7 @@ export function EventDetail({
         .filter(Boolean)
         .join(", ")
     : "";
-  const totals = game ? runTotals(game.innings) : { away: 0, home: 0 };
+  const totals = game ? gameRunTotals(game) : { away: 0, home: 0 };
   const winner = game ? gameWinner(game, totals) : null;
   const showScore = game != null && game.state !== "pregame";
   const usviSides = game ? (["away", "home"] as const).filter((s) => isUsviTeam(game[s])) : [];

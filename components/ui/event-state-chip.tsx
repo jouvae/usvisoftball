@@ -1,5 +1,5 @@
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { eventSlotEnd, runTotals, type EventWithGame, type Locale } from "@/lib/schedule-view";
+import { eventSlotEnd, gameRunTotals, type EventWithGame, type Locale } from "@/lib/schedule-view";
 
 type Tone = "upcoming" | "live" | "final" | "alert" | "pending";
 
@@ -23,7 +23,7 @@ export function eventState(
   if (event.status === "cancelled") return { label: t.stateCancelled, tone: "alert" };
   const g = event.game;
   if (g?.state === "final") {
-    const r = runTotals(g.innings);
+    const r = gameRunTotals(g);
     return { label: `${t.stateFinal} · ${r.away}–${r.home}`, tone: "final" };
   }
   if (g?.state === "live") {
